@@ -1,0 +1,233 @@
+The Game Boy is a significant step up in complexity from the Chip-8. While the Chip-8 is a "monolithic" system where the CPU does almost everything, the Game Boy is a **distributed** system where the Video Processor (PPU) and the Cartridge (MBC) run semi-independently of the CPU.
+
+To keep your sanity, you should move away from the "CPU owns everything" model and toward a **Bus-centric** model.
+
+### 1. The Recommended File Structure
+Splitting by hardware function is the gold standard for readability and debugging.
+
+* **`bus.cpp / bus.h` (The Switchboard):** This is the heart of your memory map. It holds references to all other components. When the CPU says `read(0x8000)`, the Bus redirects that to the PPU.
+* **`cpu.cpp / cpu.h`:** Contains the registers, the giant `switch` statement for opcodes, and the interrupt logic. It should **not** own the memory array; it should only have a pointer to the Bus.
+* **`ppu.cpp / ppu.h` (The GPU):** Manages VRAM and OAM. It handles the complex timing of drawing scanlines.
+* **`cartridge.cpp / cartridge.h`:** Handles loading the ROM file and the **MBC (Mapper)** logic. This is where your bank-switching math lives.
+* **`timer.cpp / timer.h`:** A small but vital file for the internal DIV and TIMA registers.
+* **`joypad.cpp / joypad.h`:** Bridges your SDL input to the `$FF00` register logic.
+
+
+
+---
+
+### 2. The "Bus" Pattern (Crucial for Game Boy)
+In your Chip-8, the CPU probably accessed an array directly. In the Game Boy, the CPU, PPU, and even the DMA (Direct Memory Access) controller all need to talk to memory. 
+
+If you put the memory in the Bus, the CPU code stays clean:
+
+```cpp
+// Inside cpu.cpp
+void CPU::execute_opcode(uint8_t opcode) {
+    switch(opcode) {
+        case 0x46: // LD B, (HL)
+            // The CPU doesn't know WHERE memory is. It just asks the bus.
+            bc.hi = bus->read(hl.reg); 
+            break;
+    }
+}
+```
+
+---
+
+### 3. Handling the "GPU" (PPU) vs. SDL
+One mistake beginners make is mixing the **PPU logic** with **SDL code**. 
+* **The PPU** should just be a state machine that turns VRAM bytes into an array of colors (e.g., a `uint32_t screen_buffer[160 * 144]`).
+* **The SDL/Main file** should simply take that buffer once per frame and push it to the window.
+
+This separation allows you to swap SDL for another library (like SFML or a web-based canvas) without touching your Game Boy core.
+
+---
+
+### 4. Why the Cartridge needs its own file
+Unlike the Chip-8, where you just load a file into RAM, Game Boy cartridges are "smart." 
+By having a `Cartridge` class, you can easily handle different games. Some games are simple (no MBC), while others have a real-time clock (MBC3) or rumble motors (MBC5). 
+
+```cpp
+// cartridge.h
+class Cartridge {
+    uint8_t* rom_data;
+    uint8_t mbc_type;
+    uint8_t current_bank;
+    
+    uint8_t read(uint16_t addr); // Handles the bank math we discussed
+    void write(uint16_t addr, uint8_t val); // Handles bank switching commands
+};
+```
+
+### 5. The Main Loop
+Your `main.cpp` becomes a simple coordinator. It looks something like this:
+
+1.  Initialize **Cartridge** with a `.gb` file.
+2.  Plug the **Cartridge**, **PPU**, and **Timer** into the **Bus**.
+3.  Plug the **Bus** into the **CPU**.
+4.  **Loop:**
+    * Tell CPU to execute one instruction (returns cycles).
+    * Tell PPU to "catch up" by that many cycles.
+    * Tell Timer to "catch up" by that many cycles.
+    * If PPU has a full frame ready, tell SDL to draw it.
+
+
+
+This structure makes it very easy to find bugs. If the game "hangs," you look at `cpu.cpp`. If the screen is garbled, you look at `ppu.cpp`. If the game crashes during a level transition, you check your bank-switching in `cartridge.cpp`.
+
+Does this "modular" approach feel like a natural evolution from your Chip-8 project?
+
+
+
+
+The Game Boy is a significant step up in complexity from the Chip-8. While the Chip-8 is a "monolithic" system where the CPU does almost everything, the Game Boy is a **distributed** system where the Video Processor (PPU) and the Cartridge (MBC) run semi-independently of the CPU.
+
+To keep your sanity, you should move away from the "CPU owns everything" model and toward a **Bus-centric** model.
+
+### 1. The Recommended File Structure
+Splitting by hardware function is the gold standard for readability and debugging.
+
+* **`bus.cpp / bus.h` (The Switchboard):** This is the heart of your memory map. It holds references to all other components. When the CPU says `read(0x8000)`, the Bus redirects that to the PPU.
+* **`cpu.cpp / cpu.h`:** Contains the registers, the giant `switch` statement for opcodes, and the interrupt logic. It should **not** own the memory array; it should only have a pointer to the Bus.
+* **`ppu.cpp / ppu.h` (The GPU):** Manages VRAM and OAM. It handles the complex timing of drawing scanlines.
+* **`cartridge.cpp / cartridge.h`:** Handles loading the ROM file and the **MBC (Mapper)** logic. This is where your bank-switching math lives.
+* **`timer.cpp / timer.h`:** A small but vital file for the internal DIV and TIMA registers.
+* **`joypad.cpp / joypad.h`:** Bridges your SDL input to the `$FF00` register logic.
+
+
+
+---
+
+### 2. The "Bus" Pattern (Crucial for Game Boy)
+In your Chip-8, the CPU probably accessed an array directly. In the Game Boy, the CPU, PPU, and even the DMA (Direct Memory Access) controller all need to talk to memory. 
+
+If you put the memory in the Bus, the CPU code stays clean:
+
+```cpp
+// Inside cpu.cpp
+void CPU::execute_opcode(uint8_t opcode) {
+    switch(opcode) {
+        case 0x46: // LD B, (HL)
+            // The CPU doesn't know WHERE memory is. It just asks the bus.
+            bc.hi = bus->read(hl.reg); 
+            break;
+    }
+}
+```
+
+---
+
+### 3. Handling the "GPU" (PPU) vs. SDL
+One mistake beginners make is mixing the **PPU logic** with **SDL code**. 
+* **The PPU** should just be a state machine that turns VRAM bytes into an array of colors (e.g., a `uint32_t screen_buffer[160 * 144]`).
+* **The SDL/Main file** should simply take that buffer once per frame and push it to the window.
+
+This separation allows you to swap SDL for another library (like SFML or a web-based canvas) without touching your Game Boy core.
+
+---
+
+### 4. Why the Cartridge needs its own file
+Unlike the Chip-8, where you just load a file into RAM, Game Boy cartridges are "smart." 
+By having a `Cartridge` class, you can easily handle different games. Some games are simple (no MBC), while others have a real-time clock (MBC3) or rumble motors (MBC5). 
+
+```cpp
+// cartridge.h
+class Cartridge {
+    uint8_t* rom_data;
+    uint8_t mbc_type;
+    uint8_t current_bank;
+    
+    uint8_t read(uint16_t addr); // Handles the bank math we discussed
+    void write(uint16_t addr, uint8_t val); // Handles bank switching commands
+};
+```
+
+### 5. The Main Loop
+Your `main.cpp` becomes a simple coordinator. It looks something like this:
+
+1.  Initialize **Cartridge** with a `.gb` file.
+2.  Plug the **Cartridge**, **PPU**, and **Timer** into the **Bus**.
+3.  Plug the **Bus** into the **CPU**.
+4.  **Loop:**
+    * Tell CPU to execute one instruction (returns cycles).
+    * Tell PPU to "catch up" by that many cycles.
+    * Tell Timer to "catch up" by that many cycles.
+    * If PPU has a full frame ready, tell SDL to draw it.
+
+
+
+This structure makes it very easy to find bugs. If the game "hangs," you look at `cpu.cpp`. If the screen is garbled, you look at `ppu.cpp`. If the game crashes during a level transition, you check your bank-switching in `cartridge.cpp`.
+
+Does this "modular" approach feel like a natural evolution from your Chip-8 project?
+
+
+You’ve identified the heavy hitters, but there are a few "hidden" memory areas that are crucial for the Game Boy to actually function. 
+
+### 1. The Missing Memory Units
+Beyond your list, you need to account for these three:
+
+* **OAM (Object Attribute Memory):** Located at **$FE00–$FE9F**. This is a tiny 160-byte chunk of RAM specifically for **sprites**. It stores things like X/Y coordinates, tile numbers, and priorities for the 40 sprites the Game Boy can show.
+* **External RAM (SRAM):** Located at **$A000–$BFFF**. This is the memory *inside the cartridge* used for save games (like your Pokémon save file). It only exists if the cartridge has a battery.
+* **I/O Registers:** Located at **$FF00–$FF7F**. As we discussed, these aren't "RAM" in the traditional sense, but the CPU treats them as a memory block. This includes the Joypad, Timer, Audio (APU), and LCD Control registers.
+
+---
+
+### 2. Where should they live? (The "Ownership" Rule)
+In software architecture, a good rule of thumb is: **Memory should live with the component that uses it the most.** #### **PPU (Graphics) Source File:**
+* **VRAM:** The PPU is the only thing that "draws" using this data.
+* **OAM:** The PPU needs this to figure out where sprites go.
+    > *Wait:* You might worry that the CPU needs to write to these to move characters. That’s fine! The **Bus** will just forward those writes to the PPU.
+
+#### **Cartridge Source File:**
+* **ROM Banks:** Obviously.
+* **External RAM (SRAM):** Since this is physically on the cartridge and gets saved to a `.sav` file on your hard drive, the `Cartridge` class should own it.
+
+#### **The "Bus" (or a dedicated Memory file):**
+* **WRAM (Work RAM):** This is the "General Purpose" memory. No single component "owns" it. It's the CPU's scratchpad. Placing it in the `Bus` class is very common.
+* **HRAM (High RAM):** Even though it’s physically near the CPU on the real board, it is used by game developers as a general-purpose area (often for "DMA Transfer" code). It’s "dumb" memory. You can put this in the `Bus` as well.
+
+
+
+---
+
+### 3. The "In-Between" Logic: I/O Registers
+The **I/O Registers ($FF00–$FF7F)** are the trickiest. They are scattered.
+* **$FF04–$FF07** (Timers) should live in `timer.cpp`.
+* **$FF40–$FF4B** (LCD Display) should live in `ppu.cpp`.
+* **$FF00** (Joypad) should live in `joypad.cpp`.
+
+When your `Bus::read_byte` or `Bus::write_byte` sees an address in the `$FF00` range, it acts like a giant "if-else" or "switch" to send that specific byte to the right object.
+
+---
+
+### 4. Special Case: The Boot ROM
+Don't forget that tiny 256-byte **Boot ROM**. 
+Most developers keep this as a simple `uint8_t bootRom[256]` array inside the `Bus` or `Cartridge` class. You also need a boolean flag like `isBootRomEnabled`. 
+
+* **If `isBootRomEnabled` is true:** `read(0x0005)` returns a byte from the `bootRom` array.
+* **If `isBootRomEnabled` is false:** `read(0x0005)` returns a byte from the actual `Cartridge` ROM.
+
+---
+
+### Recommended "Ownership" Summary Table
+
+| Component | Range | Owner Class | Why? |
+| :--- | :--- | :--- | :--- |
+| **ROM** | $0000-$7FFF | `Cartridge` | Contains game code/data. |
+| **VRAM** | $8000-$9FFF | `PPU` | Used for rendering tiles/backgrounds. |
+| **SRAM** | $A000-$BFFF | `Cartridge` | Physical RAM on the game cart. |
+| **WRAM** | $C000-$DFFF | `Bus` | General purpose scratchpad. |
+| **OAM** | $FE00-$FE9F | `PPU` | Contains sprite attribute data. |
+| **I/O Regs** | $FF00-$FF7F | `Distributed` | Split between Joypad, Timer, PPU, APU. |
+| **HRAM** | $FF80-$FFFE | `Bus` | "Zero Page" fast memory. |
+
+
+
+This structure keeps your code **decoupled**. If you want to debug why a sprite isn't showing up, you look at the `OAM` array inside your `PPU` class. You don't have to sift through a 64KB mess of other data.
+
+Does this distribution of "owners" make the project feel organized, or do you feel like the `Bus` class is getting a bit crowded?
+
+
+
+
