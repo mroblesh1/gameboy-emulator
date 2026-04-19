@@ -67,7 +67,7 @@ class Z80 {
 
         void INC_r16(uint16_t* reg_a);  // inc r16
         void DEC_r16(uint16_t* reg_b);  // dec r16
-        // add hl, r16
+        void ADD_r16(uint16_t* reg_a, uint16_t reg_b);  // add hl, r16
 
         void INC_r8(uint8_t* reg_a);    // inc r8
         void DEC_r8(uint8_t* reg_a);    // dec r8

@@ -72,11 +72,21 @@ void Z80::cycle() {
     switch (opcode) {
         // 0x00: NOP
         // No Operation
-        // 1 byte, 1 cycle
-        case (0x00):
+        // 1 byte, 4 cycles
+        case (0x00):    // NOP
         {
-            ;   // NOP
-        }
+            ;
+        } break;
+
+        // 0x10: STOP
+        // Stop
+        // 2 bytes, 4 cycles
+        case (0x10):    // STOP
+        {
+            // TODO: write instruction implementation
+            // Place the CPU in a low-power mode
+            ;   
+        } break;
 
 
         // 0x01 - 0x31 (iterating by MSB): LD r16, n16
@@ -211,9 +221,22 @@ void Z80::cycle() {
         // 0x09 - 0x39 (iterating by MSB): ADD hl, r16
         // Add r16 to the hl register
         // 1 byte, 8 cycles
+
         case (0x09):    // ADD HL, BC
         {
-            ;
+            ADD_r16(&hl.reg, bc.reg);
+        } break;
+        case (0x19):    // ADD HL, DE
+        {
+            ADD_r16(&hl.reg, de.reg);
+        } break;
+        case (0x29):    // ADD HL, HL
+        {
+            ADD_r16(&hl.reg, hl.reg);
+        } break;
+        case (0x39):    // ADD HL, SP
+        {
+            ADD_r16(&hl.reg, sp);
         } break;
 
 
@@ -356,9 +379,221 @@ void Z80::cycle() {
 
 
 
+        // 0x07 and 0x0F: RLCA & RRCA
+        // Rotate the A register (bit shifted out replaces empty bit)
+        // 1 byte, 4 cycles
+
+        case (0x07):    // RLCA
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    0
+            // C    Set if bit 7 is 1
+
+            // af.hi = a
+            int8_t c = af.hi >> 7;
+            af.hi = (af.hi << 1) + c;
+
+            setFlags(0, 0, 0, c);
+        } break;
+        case (0x0F):    // RRCA
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    0
+            // C    Set if bit 0 is 1
+
+            // af.hi = a
+            int8_t c = af.hi & 0x01;
+            af.hi = (af.hi >> 1) + ((uint8_t) c << 7);
+
+            setFlags(0, 0, 0, c);
+        } break;
+
+
+        // 0x17 and 0x1F: RLA & RRA
+        // Rotate the A register, through the carry flag (treat as a 9-bit register)
+        // 1 byte, 4 cycles
+
+        case (0x17):    // RLA
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    0
+            // C    Set if bit 7 is 1
+
+            // af.hi = a
+            int8_t c = af.hi >> 7;
+            uint8_t current_c = af.c;
+            af.hi = (af.hi << 1) + current_c;
+
+            setFlags(0, 0, 0, c);
+        } break;
+        case (0x1F):    // RRA
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    0
+            // C    Set if bit 0 is 1
+
+            // af.hi = a
+            int8_t c = af.hi & 0x01;
+            uint8_t current_c = af.c;
+            af.hi = (af.hi >> 1) + (current_c << 7);
+
+            setFlags(0, 0, 0, c);
+        } break;
+
+        // 0x27: DAA
+        // Decimal Adjust Accumulator: Convert from raw binary to Binary Coded Decimal
+        // 1 byte, 4 cycles
+        
+        case (0x27):    // DAA
+        {
+            if (af.n) {
+                uint8_t adjustment = 0;
+                if (af.h) {
+                    adjustment += 0x06;
+                }
+                if (af.c) {
+                    adjustment += 0x60;
+                }
+                af.a -= adjustment;
+            } else {
+                uint8_t adjustment = 0;
+                if (af.h | (af.a & 0x0F) > 0x09) {
+                    adjustment += 0x06;
+                }
+                if (af.c | af.a > 0x99) {
+                    adjustment += 0x60;
+                }
+                af.a += adjustment;
+            }
+        } break;
+
+        // 0x2F: CPL
+        // Complement (invert) the accumulator value
+        // 1 byte, 4 cycles
+        case (0x2F):    // CPL
+        {
+            af.hi = ~af.hi;
+        } break;
+
+        // 0x37: SCF
+        // Set carry flag
+        // 1 byte, 4 cycles
+        case (0x37):    // SCF
+        {
+            setFlags(-1, -1, -1, 1);
+        } break;
+
+        // 0x3F: CCF
+        // Complement (invert) the carry flag
+        // 1 byte, 4 cycles
+        case (0x3F):    // CCF
+        {
+            setFlags(-1, -1, -1, !af.c);
+        } break;
+
+
+        // 0x18: JR e8
+        // Relative jump to imm16(?)
+        // Or more directly, jump to the PC + an 8-bit offset
+        // 2 bytes, 12 cycles
+        case (0x18):    // JR e8
+        {
+            // byte 1: instruction
+            // increment PC
+            // (this has been done so far)
+
+            // byte 2: 8-bit signed offset
+            // increment PC
+            int8_t offset = bus.read_byte(pc);
+            ++pc;
+            // Offset from current PC
+            pc += offset;
+        } break;
+
+
+        // 0x20 - 0x30 & 0x29 - 0x39: JR cc, n16
+        // Relative jump to imm16, based on some condition
+        // 2 bytes, 12 cycles (8 cycles untaken)
+
+        case (0x20):    // JR NZ, e8
+        {
+            // byte 1: instruction
+            // increment PC
+            // (this has been done so far)
+
+            // byte 2: 8-bit signed offset
+            // increment PC
+            int8_t offset = bus.read_byte(pc);
+            ++pc;
+            // Offset from current PC
+            if (!af.z) {
+                pc += offset;
+            }
+        } break;
+
+        case (0x29):    // JR Z, e8
+        {
+            // byte 1: instruction
+            // increment PC
+            // (this has been done so far)
+
+            // byte 2: 8-bit signed offset
+            // increment PC
+            int8_t offset = bus.read_byte(pc);
+            ++pc;
+            // Offset from current PC
+            if (af.z) {
+                pc += offset;
+            }
+        } break;
+
+        case (0x30):    // JR NC, e8
+        {
+            // byte 1: instruction
+            // increment PC
+            // (this has been done so far)
+
+            // byte 2: 8-bit signed offset
+            // increment PC
+            int8_t offset = bus.read_byte(pc);
+            ++pc;
+            // Offset from current PC
+            if (!af.c) {
+                pc += offset;
+            }
+        } break;
+
+        case (0x39):    // JR C, e8
+        {
+            // byte 1: instruction
+            // increment PC
+            // (this has been done so far)
+
+            // byte 2: 8-bit signed offset
+            // increment PC
+            int8_t offset = bus.read_byte(pc);
+            ++pc;
+            // Offset from current PC
+            if (af.c) {
+                pc += offset;
+            }
+        } break;
+
+
+
         // 0x40 - 0x7F: LD r8, r8
         // Load register on right into register on left (8-bit)
         // 1 byte, 4 cycles (8 for [HL])
+
+        // B Register //
 
         case (0x40):    // LD B, B
         {
@@ -393,6 +628,43 @@ void Z80::cycle() {
         {
             LD_r8(&bc.hi, af.hi);
         } break;
+
+        
+        // C Register //
+
+        case (0x40):    // LD C, B
+        {
+            LD_r8(&bc.lo, bc.hi);
+        } break;
+        case (0x41):    // LD C, C
+        {
+            LD_r8(&bc.lo, bc.lo);
+        } break;
+        case (0x42):    // LD C, D
+        {
+            LD_r8(&bc.lo, de.hi);
+        } break;
+        case (0x43):    // LD C, E
+        {
+            LD_r8(&bc.lo, de.lo);
+        } break;
+        case (0x44):    // LD C, H
+        {
+            LD_r8(&bc.lo, hl.hi);
+        } break;
+        case (0x45):    // LD C, L
+        {
+            LD_r8(&bc.lo, hl.lo);
+        } break;
+        case (0x46):    // LD C, [HL]
+        {
+            // Load value pointed by HL into B
+            bc.lo = bus.read_byte(hl.reg);
+        } break;
+        case (0x47):    // LD C, A
+        {
+            LD_r8(&bc.lo, af.hi);
+        } break;
     }
     return;
 }
@@ -416,8 +688,27 @@ void Z80::DEC_r16(uint16_t* reg_a) {
     return;
 }
 
+void Z80::ADD_r16(uint16_t* reg_a, uint16_t reg_b) {
+    // Flags
+    // Z    Unchanged
+    // N    0
+    // H    Set if overflow from bit 11.
+    // C    Set if overflow from bit 15.
+    
+    int8_t h = (*reg_a == 0x0FFF);
+    int8_t c = (*reg_a == 0xFFFF);
+    *reg_a += reg_b;
+    setFlags(-1, 0, h, c);
+}
+
 
 void Z80::INC_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    Set if overflow from bit 3.
+    // C    Unchanged
+
     int8_t h = (*reg_a == 0x0F);
     (*reg_a)++;
     int8_t z = (*reg_a == 0x00);
