@@ -83,7 +83,7 @@ void Z80::cycle() {
         // 2 bytes, 4 cycles
         case (0x10):    // STOP
         {
-            // TODO: write instruction implementation
+            // TODO: write STOP instruction implementation
             // Place the CPU in a low-power mode
             ;   
         } break;
@@ -473,6 +473,13 @@ void Z80::cycle() {
                 }
                 af.a += adjustment;
             }
+            
+            if (af.a == 0x0) {
+                int8_t z = 0;
+            }
+            
+            // TODO: Implement flag behavior for DAA instruction (C flag)
+            setFlags(z, -1, 0, 1);
         } break;
 
         // 0x2F: CPL
@@ -481,6 +488,7 @@ void Z80::cycle() {
         case (0x2F):    // CPL
         {
             af.hi = ~af.hi;
+            setFlags(-1, 1, 1, -1);
         } break;
 
         // 0x37: SCF
@@ -488,7 +496,7 @@ void Z80::cycle() {
         // 1 byte, 4 cycles
         case (0x37):    // SCF
         {
-            setFlags(-1, -1, -1, 1);
+            setFlags(-1, 0, 0, 1);
         } break;
 
         // 0x3F: CCF
@@ -496,7 +504,7 @@ void Z80::cycle() {
         // 1 byte, 4 cycles
         case (0x3F):    // CCF
         {
-            setFlags(-1, -1, -1, !af.c);
+            setFlags(-1, 0, 0, !af.c);
         } break;
 
 
@@ -629,41 +637,264 @@ void Z80::cycle() {
             LD_r8(&bc.hi, af.hi);
         } break;
 
-        
+
         // C Register //
 
-        case (0x40):    // LD C, B
+        case (0x48):    // LD C, B
         {
             LD_r8(&bc.lo, bc.hi);
         } break;
-        case (0x41):    // LD C, C
+        case (0x49):    // LD C, C
         {
             LD_r8(&bc.lo, bc.lo);
         } break;
-        case (0x42):    // LD C, D
+        case (0x4A):    // LD C, D
         {
             LD_r8(&bc.lo, de.hi);
         } break;
-        case (0x43):    // LD C, E
+        case (0x4B):    // LD C, E
         {
             LD_r8(&bc.lo, de.lo);
         } break;
-        case (0x44):    // LD C, H
+        case (0x4C):    // LD C, H
         {
             LD_r8(&bc.lo, hl.hi);
         } break;
-        case (0x45):    // LD C, L
+        case (0x4D):    // LD C, L
         {
             LD_r8(&bc.lo, hl.lo);
         } break;
-        case (0x46):    // LD C, [HL]
+        case (0x4E):    // LD C, [HL]
         {
-            // Load value pointed by HL into B
+            // Load value pointed by HL into C
             bc.lo = bus.read_byte(hl.reg);
         } break;
-        case (0x47):    // LD C, A
+        case (0x4F):    // LD C, A
         {
             LD_r8(&bc.lo, af.hi);
+        } break;
+
+
+        // D Register //
+
+        case (0x50):    // LD D, B
+        {
+            LD_r8(&de.hi, bc.hi);
+        } break;
+        case (0x51):    // LD D, C
+        {
+            LD_r8(&de.hi, bc.lo);
+        } break;
+        case (0x52):    // LD D, D
+        {
+            LD_r8(&de.hi, de.hi);
+        } break;
+        case (0x53):    // LD D, E
+        {
+            LD_r8(&de.hi, de.lo);
+        } break;
+        case (0x54):    // LD D, H
+        {
+            LD_r8(&de.hi, hl.hi);
+        } break;
+        case (0x55):    // LD D, L
+        {
+            LD_r8(&de.hi, hl.lo);
+        } break;
+        case (0x56):    // LD D, [HL]
+        {
+            // Load value pointed by HL into D
+            de.hi = bus.read_byte(hl.reg);
+        } break;
+        case (0x57):    // LD D, A
+        {
+            LD_r8(&de.hi, af.hi);
+        } break;
+
+
+        // E Register //
+
+        case (0x58):    // LD E, B
+        {
+            LD_r8(&de.lo, bc.hi);
+        } break;
+        case (0x59):    // LD E, C
+        {
+            LD_r8(&de.lo, bc.lo);
+        } break;
+        case (0x5A):    // LD E, D
+        {
+            LD_r8(&de.lo, de.hi);
+        } break;
+        case (0x5B):    // LD E, E
+        {
+            LD_r8(&de.lo, de.lo);
+        } break;
+        case (0x5C):    // LD E, H
+        {
+            LD_r8(&de.lo, hl.hi);
+        } break;
+        case (0x5D):    // LD E, L
+        {
+            LD_r8(&de.lo, hl.lo);
+        } break;
+        case (0x5E):    // LD E, [HL]
+        {
+            // Load value pointed by HL into E
+            de.lo = bus.read_byte(hl.reg);
+        } break;
+        case (0x5F):    // LD E, A
+        {
+            LD_r8(&de.lo, af.hi);
+        } break;
+
+
+        // H Register //
+
+        case (0x60):    // LD H, B
+        {
+            LD_r8(&hl.hi, bc.hi);
+        } break;
+        case (0x61):    // LD H, C
+        {
+            LD_r8(&hl.hi, bc.lo);
+        } break;
+        case (0x62):    // LD H, D
+        {
+            LD_r8(&hl.hi, de.hi);
+        } break;
+        case (0x63):    // LD H, E
+        {
+            LD_r8(&hl.hi, de.lo);
+        } break;
+        case (0x64):    // LD H, H
+        {
+            LD_r8(&hl.hi, hl.hi);
+        } break;
+        case (0x65):    // LD H, L
+        {
+            LD_r8(&hl.hi, hl.lo);
+        } break;
+        case (0x66):    // LD H, [HL]
+        {
+            // Load value pointed by HL into B
+            hl.hi = bus.read_byte(hl.reg);
+        } break;
+        case (0x67):    // LD H, A
+        {
+            LD_r8(&hl.hi, af.hi);
+        } break;
+
+        
+        // L Register //
+
+        case (0x68):    // LD L, B
+        {
+            LD_r8(&hl.lo, bc.hi);
+        } break;
+        case (0x69):    // LD L, C
+        {
+            LD_r8(&hl.lo, bc.lo);
+        } break;
+        case (0x6A):    // LD L, D
+        {
+            LD_r8(&hl.lo, de.hi);
+        } break;
+        case (0x6B):    // LD L, E
+        {
+            LD_r8(&hl.lo, de.lo);
+        } break;
+        case (0x6C):    // LD L, H
+        {
+            LD_r8(&hl.lo, hl.hi);
+        } break;
+        case (0x6D):    // LD L, L
+        {
+            LD_r8(&hl.lo, hl.lo);
+        } break;
+        case (0x6E):    // LD L, [HL]
+        {
+            // Load value pointed by HL into C
+            hl.lo = bus.read_byte(hl.reg);
+        } break;
+        case (0x6F):    // LD L, A
+        {
+            LD_r8(&hl.lo, af.hi);
+        } break;
+
+
+        // [HL] Register //
+        // For all of these, except for HALT, 8 cycles
+
+        case (0x70):    // LD [HL], B
+        {
+            bus.write_byte(hl.reg, bc.hi);
+        } break;
+        case (0x71):    // LD [HL], C
+        {
+            bus.write_byte(hl.reg, bc.lo);
+        } break;
+        case (0x72):    // LD [HL], D
+        {
+            bus.write_byte(hl.reg, de.hi);
+        } break;
+        case (0x73):    // LD [HL], E
+        {
+            bus.write_byte(hl.reg, de.lo);
+        } break;
+        case (0x74):    // LD [HL], H
+        {
+            bus.write_byte(hl.reg, hl.hi);
+        } break;
+        case (0x75):    // LD [HL], L
+        {
+            bus.write_byte(hl.reg, hl.lo);
+        } break;
+        case (0x76):    // HALT
+        {
+            // TODO: Write HALT instruction implementation
+            ;
+        } break;
+        case (0x77):    // LD [HL], A
+        {
+            bus.write_byte(hl.reg, af.hi);
+        } break;
+
+        
+        // A Register //
+
+        case (0x78):    // LD A, B
+        {
+            LD_r8(&af.hi, bc.hi);
+        } break;
+        case (0x79):    // LD A, C
+        {
+            LD_r8(&af.hi, bc.lo);
+        } break;
+        case (0x7A):    // LD A, D
+        {
+            LD_r8(&af.hi, de.hi);
+        } break;
+        case (0x7B):    // LD A, E
+        {
+            LD_r8(&af.hi, de.lo);
+        } break;
+        case (0x7C):    // LD A, H
+        {
+            LD_r8(&af.hi, hl.hi);
+        } break;
+        case (0x7D):    // LD A, L
+        {
+            LD_r8(&af.hi, hl.lo);
+        } break;
+        case (0x7E):    // LD A, [HL]
+        {
+            // Load value pointed by HL into C
+            af.hi = bus.read_byte(hl.reg);
+        } break;
+        case (0x7F):    // LD A, A
+        {
+            LD_r8(&af.hi, af.hi);
         } break;
     }
     return;
