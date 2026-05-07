@@ -8,7 +8,7 @@
 
 #define HEX_FORMAT std::uppercase << std::setfill('0') << std::setw(2) << std::hex
 
-#define START_ADDRESS 0
+#define START_ADDRESS 0x0100
 #define AF_INIT 0
 #define BC_INIT 0
 #define DE_INIT 0
@@ -462,20 +462,21 @@ void Z80::cycle() {
                 if (af.c) {
                     adjustment += 0x60;
                 }
-                af.a -= adjustment;
+                af.a_reg -= adjustment;
             } else {
                 uint8_t adjustment = 0;
-                if (af.h | (af.a & 0x0F) > 0x09) {
+                if (af.h | ((af.a_reg & 0x0F) > 0x09)) {
                     adjustment += 0x06;
                 }
-                if (af.c | af.a > 0x99) {
+                if (af.c | (af.a_reg > 0x99)) {
                     adjustment += 0x60;
                 }
-                af.a += adjustment;
+                af.a_reg += adjustment;
             }
             
-            if (af.a == 0x0) {
-                int8_t z = 0;
+            int8_t z = -1;
+            if (af.a_reg == 0x00) {
+                z = 1;
             }
             
             // TODO: Implement flag behavior for DAA instruction (C flag)
@@ -547,7 +548,7 @@ void Z80::cycle() {
             }
         } break;
 
-        case (0x29):    // JR Z, e8
+        case (0x28):    // JR Z, e8
         {
             // byte 1: instruction
             // increment PC
@@ -579,7 +580,7 @@ void Z80::cycle() {
             }
         } break;
 
-        case (0x39):    // JR C, e8
+        case (0x38):    // JR C, e8
         {
             // byte 1: instruction
             // increment PC
@@ -896,6 +897,50 @@ void Z80::cycle() {
         {
             LD_r8(&af.hi, af.hi);
         } break;
+
+        // 0x80 - 0x87: ADD A, r8
+        // Adds r8 to A register
+        // 1 byte, 4 cycles
+        case (0x80):    // ADD A, B
+        {
+            LD_r8(&af.hi, af.hi);
+        } break;
+
+
+        // 0x88 - 0x8F: ADC A, r8
+        // Adds r8 and carry to A register
+        // 1 byte, 4 cycles
+
+
+        // 0x90 - 0x97: SUB A, r8
+        // Subtract r8 from A register
+        // 1 byte, 4 cycles
+
+
+        // 0x98 - 0x9F: SBC A, r8
+        // Subtract r8 and carry from A register
+        // 1 byte, 4 cycles
+
+
+        // 0xA0 - 0xA7: AND A, r8
+        // AND A and r8 and store result in register A
+        // 1 byte, 4 cycles
+
+
+        // 0xA8 - 0xAF: XOR A, r8
+        // XOR A and r8 and store result in register A
+        // 1 byte, 4 cycles
+
+
+        // 0xB0 - 0xB7: OR A, r8
+        // OR A and r8 and store result in register A
+        // 1 byte, 4 cycles
+
+
+        // 0xB8 - 0xBF: CP A, r8
+        // Compare r8 with value in A register
+        // Effectively, this is subtraction, but no result is saved. Output is in the flags
+        // 1 byte, 4 cycles
     }
     return;
 }
@@ -926,6 +971,21 @@ void Z80::ADD_r16(uint16_t* reg_a, uint16_t reg_b) {
     // H    Set if overflow from bit 11.
     // C    Set if overflow from bit 15.
     
+    // TODO: Fix flag behavior to ADD_r16
+
+    // To get the half carry flag, we do (reg_a ^ reg_b ^ result)
+    // The final result will have 1's in places where a bit overflowed into
+    // Assume the following
+    // reg_a = 00001100
+    // reg_b = 00001001
+    // result = 00010101
+    // First XOR yields 00000101. 
+    // Second XOR yields 00010000. Carry in 4th bit
+    uint16_t result = *reg_a + reg_b;
+
+    // And for the full carry, just compare the sum with any operand. Overflows in unsigned addition will always yield a smaller number.
+
+
     int8_t h = (*reg_a == 0x0FFF);
     int8_t c = (*reg_a == 0xFFFF);
     *reg_a += reg_b;
@@ -949,15 +1009,48 @@ void Z80::INC_r8(uint8_t* reg_a) {
 
 void Z80::DEC_r8(uint8_t* reg_a) {
     (*reg_a)--;
+
+    // TODO: Add flag behavior to DEC_r8
     return;
 }
 
-// LD r8, r8
-// Load register on right into register on left
-
-// Typically 1 byte, 4 T-cycles
-// 8 T-cycles if HL register involved
 void Z80::LD_r8(uint8_t* reg_a, uint8_t reg_b) {
     *reg_a = reg_b;
     return;
+}
+
+void Z80::ADD_r8(uint8_t reg_a) {
+    af.hi += reg_a;
+
+    int8_t z = -1;
+    if (af.hi == 0) {
+        z = 1;
+    }
+
+    int8_t h = -1;
+    int8_t c = -1;
+
+    setFlags(z, 0, h, c);
+    return;
+}
+void Z80::ADC_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::SUB_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::SBC_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::AND_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::XOR_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::OR_r8(uint8_t reg_a) {
+    ;
+}
+void Z80::CP_r8(uint8_t reg_a) {
+    ;
 }

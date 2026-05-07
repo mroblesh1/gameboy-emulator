@@ -95,14 +95,14 @@ class Z80 {
         // halt
 
         // BLOCK 2
-        // add a, r8
-        // adc a, r8
-        // sub a, r8
-        // sbc a, r8
-        // and a, r8
-        // xor a, r8
-        // or a, r8
-        // cp a, r8
+        void ADD_r8(uint8_t reg_a); // add a, r8
+        void ADC_r8(uint8_t reg_a); // adc a, r8
+        void SUB_r8(uint8_t reg_a); // sub a, r8
+        void SBC_r8(uint8_t reg_a); // sbc a, r8
+        void AND_r8(uint8_t reg_a); // and a, r8
+        void XOR_r8(uint8_t reg_a); // xor a, r8
+        void OR_r8(uint8_t reg_a); // or a, r8
+        void CP_r8(uint8_t reg_a); // cp a, r8
 
         // BLOCK 3
         // add a, imm8
