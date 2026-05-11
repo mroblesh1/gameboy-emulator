@@ -272,6 +272,11 @@ void Z80::cycle() {
         case (0x34):    // INC [HL]
         // This instruction takes 12 cycles
         {
+            // Flags
+            // Z    Set if result is 0
+            // N    0
+            // H    Set if overflow from bit 3.
+            // C    Unchanged
             uint8_t val = bus.read_byte(hl.reg);
             bus.write_byte(hl.reg, val + 1);
 
@@ -315,12 +320,17 @@ void Z80::cycle() {
         case (0x35):    // DEC [HL]
         // This instruction takes 12 cycles
         {
+            // Flags
+            // Z    Set if result is 0
+            // N    1
+            // H    Set if borrow from bit 4.
+            // C    Unchanged
             uint8_t val = bus.read_byte(hl.reg);
             bus.write_byte(hl.reg, val - 1);
             
-            int8_t h = ((val & 0x0F) == 0x0F);
+            int8_t h = ((val & 0x10) == 0x10);
             int8_t z = ((val + 1) == 0x00);
-            setFlags(z, 0, h, -1);
+            setFlags(z, 1, h, -1);
         } break;
         case (0x3D):    // DEC A
         {
@@ -474,10 +484,7 @@ void Z80::cycle() {
                 af.a_reg += adjustment;
             }
             
-            int8_t z = -1;
-            if (af.a_reg == 0x00) {
-                z = 1;
-            }
+            int8_t z = (af.a_reg == 0x00);
             
             // TODO: Implement flag behavior for DAA instruction (C flag)
             setFlags(z, -1, 0, 1);
@@ -488,6 +495,11 @@ void Z80::cycle() {
         // 1 byte, 4 cycles
         case (0x2F):    // CPL
         {
+            // Flags
+            // Z    Unchanged
+            // N    Set
+            // H    Set
+            // C    Unchanged
             af.hi = ~af.hi;
             setFlags(-1, 1, 1, -1);
         } break;
@@ -497,6 +509,11 @@ void Z80::cycle() {
         // 1 byte, 4 cycles
         case (0x37):    // SCF
         {
+            // Flags
+            // Z    Unchanged
+            // N    0
+            // H    0
+            // C    Set
             setFlags(-1, 0, 0, 1);
         } break;
 
@@ -505,6 +522,11 @@ void Z80::cycle() {
         // 1 byte, 4 cycles
         case (0x3F):    // CCF
         {
+            // Flags
+            // Z    Unchanged
+            // N    0
+            // H    0
+            // C    Invert the existing c flag
             setFlags(-1, 0, 0, !af.c);
         } break;
 
@@ -898,49 +920,304 @@ void Z80::cycle() {
             LD_r8(&af.hi, af.hi);
         } break;
 
+
+
+
         // 0x80 - 0x87: ADD A, r8
         // Adds r8 to A register
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
         case (0x80):    // ADD A, B
         {
-            LD_r8(&af.hi, af.hi);
+            ADD_r8(bc.hi);
+        } break;
+        case (0x81):    // ADD A, C
+        {
+            ADD_r8(bc.lo);
+        } break;
+        case (0x82):    // ADD A, D
+        {
+            ADD_r8(de.hi);
+        } break;
+        case (0x83):    // ADD A, E
+        {
+            ADD_r8(de.lo);
+        } break;
+        case (0x84):    // ADD A, H
+        {
+            ADD_r8(hl.hi);
+        } break;
+        case (0x85):    // ADD A, L
+        {
+            ADD_r8(hl.lo);
+        } break;
+        case (0x86):    // ADD A, [HL]
+        {
+            ADD_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0x87):    // ADD A, A
+        {
+            ADD_r8(af.hi);
         } break;
 
 
         // 0x88 - 0x8F: ADC A, r8
         // Adds r8 and carry to A register
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0x88):    // ADC A, B
+        {
+            ADC_r8(bc.hi);
+        } break;
+        case (0x89):    // ADC A, C
+        {
+            ADC_r8(bc.lo);
+        } break;
+        case (0x8A):    // ADC A, D
+        {
+            ADC_r8(de.hi);
+        } break;
+        case (0x8B):    // ADC A, E
+        {
+            ADC_r8(de.lo);
+        } break;
+        case (0x8C):    // ADC A, H
+        {
+            ADC_r8(hl.hi);
+        } break;
+        case (0x8D):    // ADC A, L
+        {
+            ADC_r8(hl.lo);
+        } break;
+        case (0x8E):    // ADC A, [HL]
+        {
+            ADC_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0x8F):    // ADC A, A
+        {
+            ADC_r8(af.hi);
+        } break;
 
 
         // 0x90 - 0x97: SUB A, r8
         // Subtract r8 from A register
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0x90):    // SUB A, B
+        {
+            SUB_r8(bc.hi);
+        } break;
+        case (0x91):    // SUB A, C
+        {
+            SUB_r8(bc.lo);
+        } break;
+        case (0x92):    // SUB A, D
+        {
+            SUB_r8(de.hi);
+        } break;
+        case (0x93):    // SUB A, E
+        {
+            SUB_r8(de.lo);
+        } break;
+        case (0x94):    // SUB A, H
+        {
+            SUB_r8(hl.hi);
+        } break;
+        case (0x95):    // SUB A, L
+        {
+            SUB_r8(hl.lo);
+        } break;
+        case (0x96):    // SUB A, [HL]
+        {
+            SUB_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0x97):    // SUB A, A
+        {
+            SUB_r8(af.hi);
+        } break;
 
 
         // 0x98 - 0x9F: SBC A, r8
         // Subtract r8 and carry from A register
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0x98):    // SBC A, B
+        {
+            SBC_r8(bc.hi);
+        } break;
+        case (0x99):    // SBC A, C
+        {
+            SBC_r8(bc.lo);
+        } break;
+        case (0x9A):    // SBC A, D
+        {
+            SBC_r8(de.hi);
+        } break;
+        case (0x9B):    // SBC A, E
+        {
+            SBC_r8(de.lo);
+        } break;
+        case (0x9C):    // SBC A, H
+        {
+            SBC_r8(hl.hi);
+        } break;
+        case (0x9D):    // SBC A, L
+        {
+            SBC_r8(hl.lo);
+        } break;
+        case (0x9E):    // SBC A, [HL]
+        {
+            SBC_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0x9F):    // SBC A, A
+        {
+            SBC_r8(af.hi);
+        } break;
 
 
         // 0xA0 - 0xA7: AND A, r8
         // AND A and r8 and store result in register A
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0xA0):    // AND A, B
+        {
+            AND_r8(bc.hi);
+        } break;
+        case (0xA1):    // AND A, C
+        {
+            AND_r8(bc.lo);
+        } break;
+        case (0xA2):    // AND A, D
+        {
+            AND_r8(de.hi);
+        } break;
+        case (0xA3):    // AND A, E
+        {
+            AND_r8(de.lo);
+        } break;
+        case (0xA4):    // AND A, H
+        {
+            AND_r8(hl.hi);
+        } break;
+        case (0xA5):    // AND A, L
+        {
+            AND_r8(hl.lo);
+        } break;
+        case (0xA6):    // AND A, [HL]
+        {
+            AND_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0xA7):    // AND A, A
+        {
+            AND_r8(af.hi);
+        } break;
 
 
         // 0xA8 - 0xAF: XOR A, r8
         // XOR A and r8 and store result in register A
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0xA8):    // XOR A, B
+        {
+            XOR_r8(bc.hi);
+        } break;
+        case (0xA9):    // XOR A, C
+        {
+            XOR_r8(bc.lo);
+        } break;
+        case (0xAA):    // XOR A, D
+        {
+            XOR_r8(de.hi);
+        } break;
+        case (0xAB):    // XOR A, E
+        {
+            XOR_r8(de.lo);
+        } break;
+        case (0xAC):    // XOR A, H
+        {
+            XOR_r8(hl.hi);
+        } break;
+        case (0xAD):    // XOR A, L
+        {
+            XOR_r8(hl.lo);
+        } break;
+        case (0xAE):    // XOR A, [HL]
+        {
+            XOR_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0xAF):    // XOR A, A
+        {
+            XOR_r8(af.hi);
+        } break;
 
 
         // 0xB0 - 0xB7: OR A, r8
         // OR A and r8 and store result in register A
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0xB0):    // OR A, B
+        {
+            OR_r8(bc.hi);
+        } break;
+        case (0xB1):    // OR A, C
+        {
+            OR_r8(bc.lo);
+        } break;
+        case (0xB2):    // OR A, D
+        {
+            OR_r8(de.hi);
+        } break;
+        case (0xB3):    // OR A, E
+        {
+            OR_r8(de.lo);
+        } break;
+        case (0xB4):    // OR A, H
+        {
+            OR_r8(hl.hi);
+        } break;
+        case (0xB5):    // OR A, L
+        {
+            OR_r8(hl.lo);
+        } break;
+        case (0xB6):    // OR A, [HL]
+        {
+            OR_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0xB7):    // OR A, A
+        {
+            OR_r8(af.hi);
+        } break;
 
 
         // 0xB8 - 0xBF: CP A, r8
         // Compare r8 with value in A register
         // Effectively, this is subtraction, but no result is saved. Output is in the flags
-        // 1 byte, 4 cycles
+        // 1 byte, 4 cycles (8 for [HL])
+        case (0xB8):    // CP A, B
+        {
+            CP_r8(bc.hi);
+        } break;
+        case (0xB9):    // CP A, C
+        {
+            CP_r8(bc.lo);
+        } break;
+        case (0xBA):    // CP A, D
+        {
+            CP_r8(de.hi);
+        } break;
+        case (0xBB):    // CP A, E
+        {
+            CP_r8(de.lo);
+        } break;
+        case (0xBC):    // CP A, H
+        {
+            CP_r8(hl.hi);
+        } break;
+        case (0xBD):    // CP A, L
+        {
+            CP_r8(hl.lo);
+        } break;
+        case (0xBE):    // CP A, [HL]
+        {
+            CP_r8(bus.read_byte(hl.reg));
+        } break;
+        case (0xBF):    // CP A, A
+        {
+            CP_r8(af.hi);
+        } break;
     }
     return;
 }
@@ -970,24 +1247,23 @@ void Z80::ADD_r16(uint16_t* reg_a, uint16_t reg_b) {
     // N    0
     // H    Set if overflow from bit 11.
     // C    Set if overflow from bit 15.
-    
-    // TODO: Fix flag behavior to ADD_r16
+
+    uint16_t result = *reg_a + reg_b;
 
     // To get the half carry flag, we do (reg_a ^ reg_b ^ result)
     // The final result will have 1's in places where a bit overflowed into
     // Assume the following
-    // reg_a = 00001100
-    // reg_b = 00001001
-    // result = 00010101
-    // First XOR yields 00000101. 
+    // reg_a  = 0x00001100
+    // reg_b  = 0x00001001
+    // result = 0x00010101
+    // First XOR yields  00000101. 
     // Second XOR yields 00010000. Carry in 4th bit
-    uint16_t result = *reg_a + reg_b;
 
-    // And for the full carry, just compare the sum with any operand. Overflows in unsigned addition will always yield a smaller number.
+    // To check for the half carry of a 16-bit number, check the value of the 12th bit
+    int8_t h = ((*reg_a ^ reg_b ^ result) & 0x1000) >> 12;
+    // To check for the carry, check if the output is less than reg_a
+    int8_t c = result < reg_b;
 
-
-    int8_t h = (*reg_a == 0x0FFF);
-    int8_t c = (*reg_a == 0xFFFF);
     *reg_a += reg_b;
     setFlags(-1, 0, h, c);
 }
@@ -1000,7 +1276,7 @@ void Z80::INC_r8(uint8_t* reg_a) {
     // H    Set if overflow from bit 3.
     // C    Unchanged
 
-    int8_t h = (*reg_a == 0x0F);
+    int8_t h = ((*reg_a & 0x0F) == 0x0F);
     (*reg_a)++;
     int8_t z = (*reg_a == 0x00);
     setFlags(z, 0, h, -1);
@@ -1008,9 +1284,16 @@ void Z80::INC_r8(uint8_t* reg_a) {
 }
 
 void Z80::DEC_r8(uint8_t* reg_a) {
-    (*reg_a)--;
+    // Flags
+    // Z    Set if result is 0
+    // N    1
+    // H    Set if borrow from bit 4.
+    // C    Unchanged
 
-    // TODO: Add flag behavior to DEC_r8
+    int8_t h = ((*reg_a & 0x10) == 0x10);
+    (*reg_a)--;
+    int8_t z = (*reg_a == 0x00);
+    setFlags(z, 1, h, -1);
     return;
 }
 
@@ -1020,37 +1303,135 @@ void Z80::LD_r8(uint8_t* reg_a, uint8_t reg_b) {
 }
 
 void Z80::ADD_r8(uint8_t reg_a) {
-    af.hi += reg_a;
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    Set if overflow from bit 3.
+    // C    Set if overflow from bit 7.
+    uint8_t result = af.hi + reg_a;
 
-    int8_t z = -1;
-    if (af.hi == 0) {
-        z = 1;
-    }
+    int8_t z = (result == 0);
+    // To check for the half carry of a 8-bit number, check the value of the 4th bit
+    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    // To check for the carry, check if the output is less than reg_a
+    // Carry is only present when there is an overflow
+    int8_t c = result < reg_a;
 
-    int8_t h = -1;
-    int8_t c = -1;
-
+    af.hi = result;
     setFlags(z, 0, h, c);
     return;
 }
+
 void Z80::ADC_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    Set if overflow from bit 3.
+    // C    Set if overflow from bit 7.
+    uint8_t result = af.hi + reg_a + af.c;
+
+    int8_t z = (result == 0);
+    // To check for the half carry of a 8-bit number, check the value of the 4th bit
+    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    // To check for the carry, check if the output is less than reg_a
+    int8_t c = result < reg_a;
+
+    af.hi = result;
+    setFlags(z, 0, h, c);
+    return;
 }
+
 void Z80::SUB_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    1
+    // H    Set if borrow from bit 4.
+    // C    Set if borrow from bit 8.
+    uint8_t result = af.hi - reg_a;
+
+    int8_t z = (result == 0);
+    // To check for the half carry of a 8-bit number, check the value of the 4th bit
+    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    // To check for the carry, check if the subtracting operand is less than reg_a
+    int8_t c = reg_a > af.hi;
+
+    af.hi = result;
+    setFlags(z, 1, h, c);
+    return;
 }
+
 void Z80::SBC_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    1
+    // H    Set if borrow from bit 4.
+    // C    Set if borrow from bit 8.
+    uint8_t result = af.hi - reg_a - af.c;
+
+    int8_t z = (result == 0);
+    // To check for the half carry of a 8-bit number, check the value of the 4th bit
+    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    // To check for the carry, check if the subtracting operand is less than reg_a
+    int8_t c = reg_a > af.hi;
+
+    af.hi = result;
+    setFlags(z, 1, h, c);
+    return;
 }
+
 void Z80::AND_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    1
+    // C    0
+
+    af.hi &= reg_a;
+    int8_t z = (af.hi == 0);
+    setFlags(z, 0, 1, 0);
+    return;
 }
+
 void Z80::XOR_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    0
+
+    af.hi ^= reg_a;
+    int8_t z = (af.hi == 0);
+    setFlags(z, 0, 0, 0);
+    return;
 }
+
 void Z80::OR_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    0
+
+    af.hi |= reg_a;
+    int8_t z = (af.hi == 0);
+    setFlags(z, 0, 0, 0);
+    return;
 }
+
 void Z80::CP_r8(uint8_t reg_a) {
-    ;
+    // Flags
+    // Z    Set if result is 0
+    // N    1
+    // H    Set if borrow from bit 4.
+    // C    Set if borrow from bit 8.
+    uint8_t result = af.hi - reg_a;
+
+    int8_t z = (result == 0);
+    // To check for the half carry of a 8-bit number, check the value of the 4th bit
+    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    // To check for the carry, check if the subtracting operand is less than reg_a
+    int8_t c = reg_a > af.hi;
+
+    setFlags(z, 1, h, c);
+    return;
 }
