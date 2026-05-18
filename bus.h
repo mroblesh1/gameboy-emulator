@@ -1,6 +1,7 @@
 #ifndef BUS_H
 #define BUS_H
 
+#include <string>
 #include <cstdint>
 
 
@@ -26,6 +27,7 @@ class Bus {
     public:
         Bus();
 
+        bool loadROM(const std::string& filename);
         uint8_t read_byte(uint16_t address);
         void write_byte(uint16_t address, uint8_t byte);
 

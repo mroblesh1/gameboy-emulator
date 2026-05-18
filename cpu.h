@@ -43,7 +43,7 @@ class Z80 {
         // Program Counter
         uint16_t pc;
 
-        Bus bus;
+        Bus* bus;
 
     public:
         Z80(Bus* data_bus);

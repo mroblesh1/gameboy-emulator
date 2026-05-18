@@ -1,6 +1,8 @@
 #include "bus.h"
 
-#include <cstdint>
+#include <iostream>
+#include <fstream>
+#include <vector>
 
 #define MEM_SIZE 0xFFFF
 
@@ -10,6 +12,37 @@ Bus::Bus() {
     for (int i = 0; i < MEM_SIZE; i++) {
         map[i] = 0;
     }
+}
+
+bool Bus::loadROM(const std::string& filename) {
+    // Open the file in binary mode and move the file pointer to the end
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+
+    if (!file.is_open()) {
+        std::cerr << "Error: Failed to open ROM file: " << filename << std::endl;
+        return false;
+    }
+
+    // Get the file size and return the pointer back to the beginning
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::vector<char> buffer(size);
+    // Read the entire file into the buffer
+    if (!file.read(buffer.data(), size)) {
+        std::cerr << "Error: Failed to read ROM data." << std::endl;
+        return false;
+    }
+
+    size_t romSize = static_cast<size_t>(size); // Used to clear warnings
+    // Write the buffer into the emulator's address space starting at 0x0000
+    for (size_t i = 0; i < romSize; ++i) {
+        if (i >= 0x10000) break;
+        map[i] = static_cast<uint8_t>(buffer[i]);
+    }
+
+    std::cout << "Successfully loaded " << size << " bytes into memory." << std::endl;
+    return true;
 }
 
 
@@ -82,6 +115,18 @@ void Bus::write_byte(uint16_t address, uint8_t byte) {
     } else if (address < HRAM_START) {          // IO Ports
         // address % IO_START
         map[address] = byte;
+
+        // For Blargg test ROMs, text is outputted via the Serial Data Register (0xFF01)
+        // The Serial Transfer Control (0xFF02) transmits from SDR when write value is 0x81
+        if (address == 0xFF02 && byte == 0x81) {
+            // Grab character in SDR
+            char character = static_cast<char>(map[0xFF01]);
+
+            std::cout << character << std::flush;
+
+            // Clear control register
+            map[0xFF02] = 0x00;
+        }
     } else if (address < IER) {                 // HRAM
         // address % HRAM_START
         map[address] = byte;

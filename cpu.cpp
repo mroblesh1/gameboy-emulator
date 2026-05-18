@@ -6,9 +6,10 @@
 #include <iostream>
 #include <iomanip>
 
-#define HEX_FORMAT std::uppercase << std::setfill('0') << std::setw(2) << std::hex
+#define HEX_FORMAT std::uppercase << std::setfill('0') << std::setw(4) << std::hex
 
 #define START_ADDRESS 0x0100
+#define SP_ADDRESS 0xFFFE
 #define AF_INIT 0
 #define BC_INIT 0
 #define DE_INIT 0
@@ -17,7 +18,7 @@
 
 Z80::Z80(Bus* data_bus) {
     pc = START_ADDRESS;
-    sp = 0;
+    sp = SP_ADDRESS;
 
     // Clear registers
     af.reg = AF_INIT;
@@ -25,7 +26,7 @@ Z80::Z80(Bus* data_bus) {
     de.reg = DE_INIT;
     hl.reg = HL_INIT;
 
-    Bus* bus = data_bus;
+    bus = data_bus;
 }
 
 void Z80::dumpRegs() {
@@ -61,8 +62,10 @@ void Z80::setFlags(int8_t z, int8_t n, int8_t h, int8_t c) {
 
 void Z80::cycle() {
     // Fetch (read the instruction addressed by PC)
-    // opcode = read_byte(pc);
-    uint8_t opcode = 0x46;  // Replace with a call to read_byte
+    uint8_t opcode = bus->read_byte(pc);
+    //uint8_t opcode = 0x46;  // Replace with a call to read_byte
+
+    //std::cout << "Executing instruction at PC: 0x" << HEX_FORMAT << (int) pc << ". Opcode: 0x" << HEX_FORMAT << (int) opcode << std::endl;
 
     // Increment PC after fetching
     ++pc;
@@ -81,12 +84,12 @@ void Z80::cycle() {
         // 0x10: STOP
         // Stop
         // 2 bytes, 4 cycles
-        case (0x10):    // STOP
-        {
-            // TODO: write STOP instruction implementation
-            // Place the CPU in a low-power mode
-            ;   
-        } break;
+        // case (0x10):    // STOP
+        // {
+        //     // TODO: write STOP instruction implementation
+        //     // Place the CPU in a low-power mode
+        //     ;   
+        // } break;
 
 
         // 0x01 - 0x31 (iterating by MSB): LD r16, n16
@@ -94,25 +97,25 @@ void Z80::cycle() {
         // 3 bytes, 12 cycles
         case (0x01):    // LD BC, n16
         {
-            bc.reg = bus.read_word(pc);
+            bc.reg = bus->read_word(pc);
             ++pc;
             ++pc;
         } break;
         case (0x11):    // LD DE, n16
         {
-            de.reg = bus.read_word(pc);
+            de.reg = bus->read_word(pc);
             ++pc;
             ++pc;
         } break;
         case (0x21):    // LD HL, n16
         {
-            hl.reg = bus.read_word(pc);
+            hl.reg = bus->read_word(pc);
             ++pc;
             ++pc;
         } break;
         case (0x31):    // LD SP, n16
         {
-            sp = bus.read_word(pc);
+            sp = bus->read_word(pc);
             ++pc;
             ++pc;
         } break;
@@ -123,7 +126,7 @@ void Z80::cycle() {
         // 3 bytes, 20 cycles
         case (0x08):    // LD [r16], sp
         {
-            bus.write_word(bus.read_word(pc), sp);
+            bus->write_word(bus->read_word(pc), sp);
             ++pc;
             ++pc;
         } break;
@@ -134,20 +137,20 @@ void Z80::cycle() {
         // 1 byte, 8 cycles
         case (0x02):    // LD [BC], A
         {
-            bus.write_byte(bc.reg, af.hi);
+            bus->write_byte(bc.reg, af.hi);
         } break;
         case (0x12):    // LD [DE], A
         {
-            bus.write_byte(de.reg, af.hi);
+            bus->write_byte(de.reg, af.hi);
         } break;
         case (0x22):    // LD [HL+], A
         {
-            bus.write_byte(hl.reg, af.hi);
+            bus->write_byte(hl.reg, af.hi);
             hl.reg++;
         } break;
         case (0x32):    // LD [HL-], A
         {
-            bus.write_byte(hl.reg, af.hi);
+            bus->write_byte(hl.reg, af.hi);
             hl.reg--;
         } break;
 
@@ -156,20 +159,20 @@ void Z80::cycle() {
         // 1 byte, 8 cycles
         case (0x0A):    // LD A, [BC]
         {
-            af.hi = bus.read_byte(bc.reg);
+            af.hi = bus->read_byte(bc.reg);
         } break;
         case (0x1A):    // LD A, [DE]
         {
-            af.hi = bus.read_byte(de.reg);
+            af.hi = bus->read_byte(de.reg);
         } break;
         case (0x2A):    // LD A, [HL+]
         {
-            af.hi = bus.read_byte(hl.reg);
+            af.hi = bus->read_byte(hl.reg);
             hl.reg++;
         } break;
         case (0x3A):    // LD A, [HL-]
         {
-            af.hi = bus.read_byte(hl.reg);
+            af.hi = bus->read_byte(hl.reg);
             hl.reg--;
         } break;
 
@@ -277,8 +280,8 @@ void Z80::cycle() {
             // N    0
             // H    Set if overflow from bit 3.
             // C    Unchanged
-            uint8_t val = bus.read_byte(hl.reg);
-            bus.write_byte(hl.reg, val + 1);
+            uint8_t val = bus->read_byte(hl.reg);
+            bus->write_byte(hl.reg, val + 1);
 
             int8_t h = ((val & 0x0F) == 0x0F);
             int8_t z = ((val + 1) == 0x00);
@@ -325,8 +328,8 @@ void Z80::cycle() {
             // N    1
             // H    Set if borrow from bit 4.
             // C    Unchanged
-            uint8_t val = bus.read_byte(hl.reg);
-            bus.write_byte(hl.reg, val - 1);
+            uint8_t val = bus->read_byte(hl.reg);
+            bus->write_byte(hl.reg, val - 1);
             
             int8_t h = ((val & 0x10) == 0x10);
             int8_t z = ((val + 1) == 0x00);
@@ -346,44 +349,44 @@ void Z80::cycle() {
         // For all instructions, read a second byte for the imm8
         case (0x06):    // LD B, n8
         {
-            bc.hi = bus.read_byte(pc);
+            bc.hi = bus->read_byte(pc);
             ++pc;
             ;
         } break;
         case (0x0E):    // LD C, n8
         {
-            bc.lo = bus.read_byte(pc);
+            bc.lo = bus->read_byte(pc);
             ++pc;
         } break;
         case (0x16):    // LD D, n8
         {
-            de.hi = bus.read_byte(pc);
+            de.hi = bus->read_byte(pc);
             ++pc;
         } break;
         case (0x1E):    // LD E, n8
         {
-            de.lo = bus.read_byte(pc);
+            de.lo = bus->read_byte(pc);
             ++pc;
         } break;
         case (0x26):    // LD H, n8
         {
-            hl.hi = bus.read_byte(pc);
+            hl.hi = bus->read_byte(pc);
             ++pc;
         } break;
         case (0x2E):    // LD L, n8
         {
-            hl.lo = bus.read_byte(pc);
+            hl.lo = bus->read_byte(pc);
             ++pc;
         } break;
         case (0x36):    // LD [HL], n8
         {
             // 12 cycles
-            bus.write_byte(hl.reg, bus.read_byte(pc));
+            bus->write_byte(hl.reg, bus->read_byte(pc));
             ++pc;
         } break;
         case (0x3E):    // LD A, n8
         {
-            af.hi = bus.read_byte(pc);
+            af.hi = bus->read_byte(pc);
             ++pc;
         } break;
 
@@ -543,7 +546,7 @@ void Z80::cycle() {
 
             // byte 2: 8-bit signed offset
             // increment PC
-            int8_t offset = bus.read_byte(pc);
+            int8_t offset = bus->read_byte(pc);
             ++pc;
             // Offset from current PC
             pc += offset;
@@ -552,7 +555,7 @@ void Z80::cycle() {
 
         // 0x20 - 0x30 & 0x29 - 0x39: JR cc, n16
         // Relative jump to imm16, based on some condition
-        // 2 bytes, 12 cycles (8 cycles untaken)
+        // 2 bytes, 12 cycles (8 cycles if untaken)
 
         case (0x20):    // JR NZ, e8
         {
@@ -562,7 +565,7 @@ void Z80::cycle() {
 
             // byte 2: 8-bit signed offset
             // increment PC
-            int8_t offset = bus.read_byte(pc);
+            int8_t offset = bus->read_byte(pc);
             ++pc;
             // Offset from current PC
             if (!af.z) {
@@ -578,7 +581,7 @@ void Z80::cycle() {
 
             // byte 2: 8-bit signed offset
             // increment PC
-            int8_t offset = bus.read_byte(pc);
+            int8_t offset = bus->read_byte(pc);
             ++pc;
             // Offset from current PC
             if (af.z) {
@@ -594,7 +597,7 @@ void Z80::cycle() {
 
             // byte 2: 8-bit signed offset
             // increment PC
-            int8_t offset = bus.read_byte(pc);
+            int8_t offset = bus->read_byte(pc);
             ++pc;
             // Offset from current PC
             if (!af.c) {
@@ -610,7 +613,7 @@ void Z80::cycle() {
 
             // byte 2: 8-bit signed offset
             // increment PC
-            int8_t offset = bus.read_byte(pc);
+            int8_t offset = bus->read_byte(pc);
             ++pc;
             // Offset from current PC
             if (af.c) {
@@ -653,7 +656,7 @@ void Z80::cycle() {
         case (0x46):    // LD B, [HL]
         {
             // Load value pointed by HL into B
-            bc.hi = bus.read_byte(hl.reg);
+            bc.hi = bus->read_byte(hl.reg);
         } break;
         case (0x47):    // LD B, A
         {
@@ -690,7 +693,7 @@ void Z80::cycle() {
         case (0x4E):    // LD C, [HL]
         {
             // Load value pointed by HL into C
-            bc.lo = bus.read_byte(hl.reg);
+            bc.lo = bus->read_byte(hl.reg);
         } break;
         case (0x4F):    // LD C, A
         {
@@ -727,7 +730,7 @@ void Z80::cycle() {
         case (0x56):    // LD D, [HL]
         {
             // Load value pointed by HL into D
-            de.hi = bus.read_byte(hl.reg);
+            de.hi = bus->read_byte(hl.reg);
         } break;
         case (0x57):    // LD D, A
         {
@@ -764,7 +767,7 @@ void Z80::cycle() {
         case (0x5E):    // LD E, [HL]
         {
             // Load value pointed by HL into E
-            de.lo = bus.read_byte(hl.reg);
+            de.lo = bus->read_byte(hl.reg);
         } break;
         case (0x5F):    // LD E, A
         {
@@ -801,7 +804,7 @@ void Z80::cycle() {
         case (0x66):    // LD H, [HL]
         {
             // Load value pointed by HL into B
-            hl.hi = bus.read_byte(hl.reg);
+            hl.hi = bus->read_byte(hl.reg);
         } break;
         case (0x67):    // LD H, A
         {
@@ -838,7 +841,7 @@ void Z80::cycle() {
         case (0x6E):    // LD L, [HL]
         {
             // Load value pointed by HL into C
-            hl.lo = bus.read_byte(hl.reg);
+            hl.lo = bus->read_byte(hl.reg);
         } break;
         case (0x6F):    // LD L, A
         {
@@ -851,36 +854,36 @@ void Z80::cycle() {
 
         case (0x70):    // LD [HL], B
         {
-            bus.write_byte(hl.reg, bc.hi);
+            bus->write_byte(hl.reg, bc.hi);
         } break;
         case (0x71):    // LD [HL], C
         {
-            bus.write_byte(hl.reg, bc.lo);
+            bus->write_byte(hl.reg, bc.lo);
         } break;
         case (0x72):    // LD [HL], D
         {
-            bus.write_byte(hl.reg, de.hi);
+            bus->write_byte(hl.reg, de.hi);
         } break;
         case (0x73):    // LD [HL], E
         {
-            bus.write_byte(hl.reg, de.lo);
+            bus->write_byte(hl.reg, de.lo);
         } break;
         case (0x74):    // LD [HL], H
         {
-            bus.write_byte(hl.reg, hl.hi);
+            bus->write_byte(hl.reg, hl.hi);
         } break;
         case (0x75):    // LD [HL], L
         {
-            bus.write_byte(hl.reg, hl.lo);
+            bus->write_byte(hl.reg, hl.lo);
         } break;
-        case (0x76):    // HALT
-        {
-            // TODO: Write HALT instruction implementation
-            ;
-        } break;
+        // case (0x76):    // HALT
+        // {
+        //     // TODO: Write HALT instruction implementation
+        //     ;
+        // } break;
         case (0x77):    // LD [HL], A
         {
-            bus.write_byte(hl.reg, af.hi);
+            bus->write_byte(hl.reg, af.hi);
         } break;
 
         
@@ -913,7 +916,7 @@ void Z80::cycle() {
         case (0x7E):    // LD A, [HL]
         {
             // Load value pointed by HL into C
-            af.hi = bus.read_byte(hl.reg);
+            af.hi = bus->read_byte(hl.reg);
         } break;
         case (0x7F):    // LD A, A
         {
@@ -952,7 +955,7 @@ void Z80::cycle() {
         } break;
         case (0x86):    // ADD A, [HL]
         {
-            ADD_r8(bus.read_byte(hl.reg));
+            ADD_r8(bus->read_byte(hl.reg));
         } break;
         case (0x87):    // ADD A, A
         {
@@ -989,7 +992,7 @@ void Z80::cycle() {
         } break;
         case (0x8E):    // ADC A, [HL]
         {
-            ADC_r8(bus.read_byte(hl.reg));
+            ADC_r8(bus->read_byte(hl.reg));
         } break;
         case (0x8F):    // ADC A, A
         {
@@ -1026,7 +1029,7 @@ void Z80::cycle() {
         } break;
         case (0x96):    // SUB A, [HL]
         {
-            SUB_r8(bus.read_byte(hl.reg));
+            SUB_r8(bus->read_byte(hl.reg));
         } break;
         case (0x97):    // SUB A, A
         {
@@ -1063,7 +1066,7 @@ void Z80::cycle() {
         } break;
         case (0x9E):    // SBC A, [HL]
         {
-            SBC_r8(bus.read_byte(hl.reg));
+            SBC_r8(bus->read_byte(hl.reg));
         } break;
         case (0x9F):    // SBC A, A
         {
@@ -1100,7 +1103,7 @@ void Z80::cycle() {
         } break;
         case (0xA6):    // AND A, [HL]
         {
-            AND_r8(bus.read_byte(hl.reg));
+            AND_r8(bus->read_byte(hl.reg));
         } break;
         case (0xA7):    // AND A, A
         {
@@ -1137,7 +1140,7 @@ void Z80::cycle() {
         } break;
         case (0xAE):    // XOR A, [HL]
         {
-            XOR_r8(bus.read_byte(hl.reg));
+            XOR_r8(bus->read_byte(hl.reg));
         } break;
         case (0xAF):    // XOR A, A
         {
@@ -1174,7 +1177,7 @@ void Z80::cycle() {
         } break;
         case (0xB6):    // OR A, [HL]
         {
-            OR_r8(bus.read_byte(hl.reg));
+            OR_r8(bus->read_byte(hl.reg));
         } break;
         case (0xB7):    // OR A, A
         {
@@ -1212,12 +1215,264 @@ void Z80::cycle() {
         } break;
         case (0xBE):    // CP A, [HL]
         {
-            CP_r8(bus.read_byte(hl.reg));
+            CP_r8(bus->read_byte(hl.reg));
         } break;
         case (0xBF):    // CP A, A
         {
             CP_r8(af.hi);
         } break;
+
+
+
+        // Block 3
+
+        // 0xC3: JP n16
+        // Jump to address n16
+        // 3 bytes, 16 cycles
+        case (0xC3):    // JP n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Finally, jump to address n16
+            pc = n16;
+        } break;
+
+
+        // 0xC2 - 0xD2, 0xCA - 0xDA: JP cc, n16
+        // Jump to address n16 depending on some condition
+        // 3 bytes, 16/12 cycles (if cond met / not met)
+
+        case (0xC2):    // JP NZ, n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Finally, jump to address n16 based on condition
+            if (!af.z) {
+                pc = n16;
+            }
+        } break;
+
+        case (0xD2):    // JP NC, n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Finally, jump to address n16 based on condition
+            if (!af.c) {
+                pc = n16;
+            }
+        } break;
+
+        case (0xCA):    // JP Z, n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Finally, jump to address n16 based on condition
+            if (af.z) {
+                pc = n16;
+            }
+        } break;
+
+        case (0xDA):    // JP C, n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Finally, jump to address n16 based on condition
+            if (af.c) {
+                pc = n16;
+            }
+        } break;
+
+
+        // 0xDC: CALL n16
+        // Call address n16
+        // Pushes address of next instruction to stack, then execute JP n16
+        // 3 bytes, 24 cycles
+        case (0xCD):    // CALL n16
+        {
+            // First, read two bytes to get n16
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Then, push the next instruction to the stack
+            sp--;
+            sp--;
+            bus->write_word(sp, pc);
+
+            // Finally, jump to address n16
+            pc = n16;
+        } break;
+        
+
+        // 0xC4 - 0xD4, 0xCC - 0xDC: CALL cc, n16
+        // Call address n16 depending on some condition
+        // 3 bytes, 24/12 cycles (if cond met / not met)
+        
+        case (0xC4):    // CALL NZ, n16
+        {
+            // First, read two bytes to get n16
+            // Must always do this in order to finish reading the complete instruction
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Then, push/jump if condition met
+            if (!af.z) {
+                sp--;
+                sp--;
+                bus->write_word(sp, pc);
+
+                // Finally, jump to address n16
+                pc = n16;
+            }
+        } break;
+        
+        case (0xD4):    // CALL NC, n16
+        {
+            // First, read two bytes to get n16
+            // Must always do this in order to finish reading the complete instruction
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Then, push/jump if condition met
+            if (!af.c) {
+                sp--;
+                sp--;
+                bus->write_word(sp, pc);
+
+                // Finally, jump to address n16
+                pc = n16;
+            }
+        } break;
+        
+        case (0xCC):    // CALL Z, n16
+        {
+            // First, read two bytes to get n16
+            // Must always do this in order to finish reading the complete instruction
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Then, push/jump if condition met
+            if (af.z) {
+                sp--;
+                sp--;
+                bus->write_word(sp, pc);
+
+                // Finally, jump to address n16
+                pc = n16;
+            }
+        } break;
+        
+        case (0xDC):    // CALL C, n16
+        {
+            // First, read two bytes to get n16
+            // Must always do this in order to finish reading the complete instruction
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            // Then, push/jump if condition met
+            if (af.c) {
+                sp--;
+                sp--;
+                bus->write_word(sp, pc);
+
+                // Finally, jump to address n16
+                pc = n16;
+            }
+        } break;
+
+
+
+        // 0xE0: LDH [a8], A
+        // Copy value in A reg into [0xFF00 + n8]
+        // 2 bytes, 12 cycles
+        case (0xE0):    // LDH [a8], A
+        {
+            uint8_t a8 = bus->read_byte(pc);
+            pc++;
+
+            bus->write_byte(0xFF00 + a8, af.hi);
+        } break;
+
+        // 0xF0: LDH A, [a8]
+        // Copy value in [0xFF00 + n8] into A reg
+        // 2 bytes, 12 cycles
+        case (0xF0):    // LDH A, [a8]
+        {
+            uint8_t a8 = bus->read_byte(pc);
+            pc++;
+
+            af.hi = bus->read_byte(0xFF00 + a8);
+        } break;
+
+        // 0xE3: LDH [C], A
+        // Copy value in A reg into [$FF00 + C]
+        // 1 byte, 8 cycles
+        case (0xE3):    // LDH [C], A
+        {
+            bus->write_byte(0xFF00 + bc.lo, af.hi);
+        } break;
+
+        // 0xF3: LDH A, [C]
+        // Copy byte at [$FF00 + C] into reg A
+        // 1 byte, 8 cycles
+        case (0xF3):    // LDH A, [C]
+        {
+            af.hi = bus->read_byte(0xFF00 + bc.lo);
+        } break;
+
+
+
+        // 0xEA: LD [n16], A
+        // Load value in A reg into [n16]
+        // 3 bytes, 16 cycles
+        case (0xEA):    // LD [n16], A
+        {
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            bus->write_byte(n16, af.hi);
+        } break;
+
+        // 0xFA: LD A, [n16]
+        // Load value at [n16] into A reg
+        // 3 bytes, 16 cycles
+        case (0xFA):    // LD A, [n16]
+        {
+            uint16_t n16 = bus->read_word(pc);
+            pc++;
+            pc++;
+
+            af.hi = bus->read_byte(n16);
+        } break;
+
+
+        default:
+        {
+            std::cerr << "Unimplemented Opcode: 0x" << std::hex << (int)opcode 
+                    << " at PC: 0x" << (pc - 1) << std::endl;
+            std::exit(1); // Safely crash the emulator so you know exactly what to code next
+        } break;
+        
     }
     return;
 }

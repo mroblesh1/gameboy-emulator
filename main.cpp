@@ -47,32 +47,42 @@ int main(int argc, char** argv) {
     Bus bus;
     Z80 z80(&bus);
     
-    std::cout << "Initial Dump" << std::endl;
-    z80.dumpRegs();
-    std::cout << "\n";
+    // std::cout << "Initial Dump" << std::endl;
+    // z80.dumpRegs();
+    // std::cout << "\n";
 
-    z80.LD_n8(&z80.af.hi, 1);
-    z80.LD_n8(&z80.bc.hi, 5);
-    z80.LD_n8(&z80.de.hi, 15);
-    z80.LD_n8(&z80.hl.hi, 37);
+    // z80.LD_n8(&z80.af.hi, 1);
+    // z80.LD_n8(&z80.bc.hi, 5);
+    // z80.LD_n8(&z80.de.hi, 15);
+    // z80.LD_n8(&z80.hl.hi, 37);
 
-    z80.LD_n8(&z80.af.lo, 50);
-    z80.LD_n8(&z80.bc.lo, 10);
-    z80.LD_n8(&z80.de.lo, 200);
-    z80.LD_n8(&z80.hl.lo, 3);
+    // z80.LD_n8(&z80.af.lo, 50);
+    // z80.LD_n8(&z80.bc.lo, 10);
+    // z80.LD_n8(&z80.de.lo, 200);
+    // z80.LD_n8(&z80.hl.lo, 3);
 
-    std::cout << "Loaded Registers" << std::endl;
-    z80.dumpRegs();
-    std::cout << "\n";
+    // std::cout << "Loaded Registers" << std::endl;
+    // z80.dumpRegs();
+    // std::cout << "\n";
 
-    z80.cycle();
-    std::cout << "One cycle (0x46)" << std::endl;
-    z80.dumpRegs();
-    std::cout << "\n";
+    // z80.cycle();
+    // std::cout << "One cycle (0x46)" << std::endl;
+    // z80.dumpRegs();
+    // std::cout << "\n";
 
-    z80.setFlags(1, 1, 0, 0);
-    std::cout << "Set flags, affecting F Register" << std::endl;
-    z80.dumpRegs();
+    // z80.setFlags(1, 1, 0, 0);
+    // std::cout << "Set flags, affecting F Register" << std::endl;
+    // z80.dumpRegs();
+    // std::cout << "\n";
+
+
+    // Loading in the test ROM
+    bus.loadROM("ROMs/03-op sp,hl.gb");
+
+    while (true) {
+        z80.cycle();
+    }
+    
 
 
     return 0;
