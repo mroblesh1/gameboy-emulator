@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
 
 
     // Loading in the test ROM
-    bus.loadROM("ROMs/03-op sp,hl.gb");
+    bus.loadROM("ROMs/01-special.gb");
 
     while (true) {
         z80.cycle();

@@ -9,7 +9,7 @@
 #define HEX_FORMAT std::uppercase << std::setfill('0') << std::setw(4) << std::hex
 
 #define START_ADDRESS 0x0100
-#define SP_ADDRESS 0xFFFE
+#define SP_ADDRESS 0xFFFF       // Technically should start at 0xFFFE but offset to account for how data is written
 #define AF_INIT 0
 #define BC_INIT 0
 #define DE_INIT 0
@@ -63,9 +63,9 @@ void Z80::setFlags(int8_t z, int8_t n, int8_t h, int8_t c) {
 void Z80::cycle() {
     // Fetch (read the instruction addressed by PC)
     uint8_t opcode = bus->read_byte(pc);
-    //uint8_t opcode = 0x46;  // Replace with a call to read_byte
 
-    //std::cout << "Executing instruction at PC: 0x" << HEX_FORMAT << (int) pc << ". Opcode: 0x" << HEX_FORMAT << (int) opcode << std::endl;
+    // CPU state output
+    //std::cout << "PC: 0x" << HEX_FORMAT << (int) pc << ". Opcode: 0x" << HEX_FORMAT << (int) opcode << ". SP: 0x" << HEX_FORMAT << (int) sp << std::endl;
 
     // Increment PC after fetching
     ++pc;
@@ -1226,6 +1226,66 @@ void Z80::cycle() {
 
         // Block 3
 
+        // 0xC9: RET
+        // Return from subroutine (Pop address at SP and jump to address)
+        // 1 byte, 16 cycles
+        case (0xC9):    // RET
+        {
+            pc = bus->read_word(sp);    // Set pc to popped value
+            // Update sp
+            sp++;
+            sp++;
+        } break;
+
+        // 0xC0 - 0xD0, 0xC8 - 0xD8: RET cc
+        // Return from subroutine depending on condition
+        // 1 byte, 20 cycles (8 untaken)
+
+        case (0xC0):    // RET NZ
+        {
+            if (!af.z) {
+                pc = bus->read_word(sp);    // Set pc to popped value
+                // Update sp
+                sp++;
+                sp++;
+            }
+        } break;
+
+        case (0xD0):    // RET NC
+        {
+            if (!af.c) {
+                pc = bus->read_word(sp);    // Set pc to popped value
+                // Update sp
+                sp++;
+                sp++;
+            }
+        } break;
+
+
+        case (0xC8):    // RET Z
+        {
+            if (af.z) {
+                pc = bus->read_word(sp);    // Set pc to popped value
+                // Update sp
+                sp++;
+                sp++;
+            }
+        } break;
+
+
+        case (0xD8):    // RET C
+        {
+            if (af.c) {
+                pc = bus->read_word(sp);    // Set pc to popped value
+                // Update sp
+                sp++;
+                sp++;
+            }
+        } break;
+
+
+
+
         // 0xC3: JP n16
         // Jump to address n16
         // 3 bytes, 16 cycles
@@ -1401,6 +1461,73 @@ void Z80::cycle() {
 
 
 
+        // 0xC1 - 0xF1: POP r16
+        // Pop the stack and place the value in r16
+        // 1 byte, 12 cycles
+
+        case (0xC1):    // POP BC
+        {
+            bc.reg = bus->read_word(sp);
+            sp++;
+            sp++;
+        } break;
+
+        case (0xD1):    // POP DE
+        {
+            de.reg = bus->read_word(sp);
+            sp++;
+            sp++;
+        } break;
+
+        case (0xE1):    // POP HL
+        {
+            hl.reg = bus->read_word(sp);
+            sp++;
+            sp++;
+        } break;
+
+        case (0xF1):    // POP AF
+        {
+            af.reg = bus->read_word(sp);
+            sp++;
+            sp++;
+        } break;
+
+
+        // 0xC5 - 0xF5: PUSH r16
+        // Push the value in r16 onto the stack
+        // 1 byte, 16 cycles
+
+        case (0xC5):    // PUSH BC
+        {
+            sp--;
+            sp--;
+            bus->write_word(sp, bc.reg);
+        } break;
+
+        case (0xD5):    // PUSH DE
+        {
+            sp--;
+            sp--;
+            bus->write_word(sp, de.reg);
+        } break;
+
+        case (0xE5):    // PUSH HL
+        {
+            sp--;
+            sp--;
+            bus->write_word(sp, hl.reg);
+        } break;
+
+        case (0xF5):    // PUSH AF
+        {
+            sp--;
+            sp--;
+            bus->write_word(sp, af.reg);
+        } break;
+
+
+
         // 0xE0: LDH [a8], A
         // Copy value in A reg into [0xFF00 + n8]
         // 2 bytes, 12 cycles
@@ -1464,6 +1591,77 @@ void Z80::cycle() {
 
             af.hi = bus->read_byte(n16);
         } break;
+
+
+
+        // 0xC6 - 0xF6, oxCE - 0xFE: ALU A, n8
+        // Same ALU operatiosn in Block 2, but with n8 instead of r8
+        // 2 bytes, 8 cycles
+
+        case (0xC6):    // ADD A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            ADD_r8(n8);
+        } break;
+
+        case (0xCE):    // ADC A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            ADC_r8(n8);
+        } break;
+
+        case (0xD6):    // SUB A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            SUB_r8(n8);
+        } break;
+
+        case (0xDE):    // SBC A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            SBC_r8(n8);
+        } break;
+
+        case (0xE6):    // AND A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            AND_r8(n8);
+        } break;
+
+        case (0xEE):    // XOR A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            XOR_r8(n8);
+        } break;
+
+        case (0xF6):    // OR A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            OR_r8(n8);
+        } break;
+
+        case (0xFE):    // CP A, n8
+        {
+            uint8_t n8 = bus->read_byte(pc);
+            pc++;
+
+            CP_r8(n8);
+        } break;
+
 
 
         default:
