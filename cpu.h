@@ -104,6 +104,7 @@ class Z80 {
         void OR_r8(uint8_t reg_a); // or a, r8
         void CP_r8(uint8_t reg_a); // cp a, r8
 
+
         // BLOCK 3
         // add a, imm8
         // adc a, imm8
@@ -114,6 +115,32 @@ class Z80 {
         // or a, imm8
         // cp a, imm8
 
+
+        // PREFIX
+        // 0x00 - 0x07: RLC r8
+        // 0x08 - 0x0F: RRC r8
+        // 0x10 - 0x17: RL r8
+        void RR_r8(uint8_t* reg_a);     // 0x18 - 0x1F: RR r8
+
+        // 0x20 - 0x27: SLA r8
+        // 0x28 - 0x2F: SRA r8
+        void SWAP_r8(uint8_t* reg_a);   // 0x30 - 0x37: SWAP r8
+        void SRL_r8(uint8_t* reg_a);    // 0x38 - 0x3F: SRL r8
+
+        // 0x40 - 0x47: BIT 0, r8
+        // 0x48 - 0x4F: BIT 1, r8
+        // ...
+        // 0x78 - 0x7F: BIT 7, r8
+        
+        // 0x80 - 0x87: RES 0, r8
+        // 0x88 - 0x8F: RES 1, r8
+        // ...
+        // 0xB8 - 0xBF: RES 7, r8
+
+        // 0xC0 - 0xC7: SET 0, r8
+        // 0xC8 - 0xCF: SET 1, r8
+        // ...
+        // 0xF8 - 0xFF: SET 7, r8
 
 
 };

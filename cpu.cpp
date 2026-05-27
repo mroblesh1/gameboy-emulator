@@ -404,7 +404,6 @@ void Z80::cycle() {
             // H    0
             // C    Set if bit 7 is 1
 
-            // af.hi = a
             int8_t c = af.hi >> 7;
             af.hi = (af.hi << 1) + c;
 
@@ -418,7 +417,6 @@ void Z80::cycle() {
             // H    0
             // C    Set if bit 0 is 1
 
-            // af.hi = a
             int8_t c = af.hi & 0x01;
             af.hi = (af.hi >> 1) + ((uint8_t) c << 7);
 
@@ -438,7 +436,9 @@ void Z80::cycle() {
             // H    0
             // C    Set if bit 7 is 1
 
-            // af.hi = a
+            // TODO: Review if current_c is necessary.
+            // I use it to typecast af.c to uint8_t, but it might be possible to skip entirely
+
             int8_t c = af.hi >> 7;
             uint8_t current_c = af.c;
             af.hi = (af.hi << 1) + current_c;
@@ -453,7 +453,6 @@ void Z80::cycle() {
             // H    0
             // C    Set if bit 0 is 1
 
-            // af.hi = a
             int8_t c = af.hi & 0x01;
             uint8_t current_c = af.c;
             af.hi = (af.hi >> 1) + (current_c << 7);
@@ -467,6 +466,8 @@ void Z80::cycle() {
         
         case (0x27):    // DAA
         {
+            int8_t c = -1;
+
             if (af.n) {
                 uint8_t adjustment = 0;
                 if (af.h) {
@@ -483,6 +484,7 @@ void Z80::cycle() {
                 }
                 if (af.c | (af.a_reg > 0x99)) {
                     adjustment += 0x60;
+                    c = 1;
                 }
                 af.a_reg += adjustment;
             }
@@ -490,7 +492,7 @@ void Z80::cycle() {
             int8_t z = (af.a_reg == 0x00);
             
             // TODO: Implement flag behavior for DAA instruction (C flag)
-            setFlags(z, -1, 0, 1);
+            setFlags(z, -1, 0, c);
         } break;
 
         // 0x2F: CPL
@@ -1357,6 +1359,14 @@ void Z80::cycle() {
             }
         } break;
 
+        // 0xE9: JP HL
+        // Jump to 16-bit address in HL register
+        // 1 byte, 4 cycles
+        case (0xE9):
+        {
+            pc = hl.reg;
+        } break;
+
 
         // 0xDC: CALL n16
         // Call address n16
@@ -1488,7 +1498,7 @@ void Z80::cycle() {
 
         case (0xF1):    // POP AF
         {
-            af.reg = bus->read_word(sp);
+            af.reg = bus->read_word(sp) & 0xFFF0;   // ALways hard code last 4 bits to 0
             sp++;
             sp++;
         } break;
@@ -1661,6 +1671,199 @@ void Z80::cycle() {
 
             CP_r8(n8);
         } break;
+
+
+
+        // 0xCB: PREFIX
+        // This specifies that the instruction will be a prefix command. Next byte determines which instruction
+        // 1 byte, 4 cycles
+        case (0xCB):    // PREFIX
+        {
+            // Fetch prefix instruction
+            opcode = bus->read_byte(pc);
+            pc++;
+
+            // Execute
+            switch (opcode) {
+
+                // 0x00 - 0x07: RLC r8
+                // 0x08 - 0x0F: RRC r8
+                // 0x10 - 0x17: RL r8
+
+                // 0x18 - 0x1F: RR r8
+                // Rotate right r8 through the carry bit. Think of it as a 9-bit register
+                // 2 bytes, 8 cycles
+                case (0x18):    // RR B
+                {
+                    RR_r8(&bc.hi);
+                } break;
+                case (0x19):    // RR C
+                {
+                    RR_r8(&bc.lo);
+                } break;
+                case (0x1A):    // RR D
+                {
+                    RR_r8(&de.hi);
+                } break;
+                case (0x1B):    // RR E
+                {
+                    RR_r8(&de.lo);
+                } break;
+                case (0x1C):    // RR H
+                {
+                    RR_r8(&hl.hi);
+                } break;
+                case (0x1D):    // RR L
+                {
+                    RR_r8(&hl.lo);
+                } break;
+                case (0x1E):    // RR [HL]
+                {
+                    // Flags
+                    // Z    Set if result is 0
+                    // N    0
+                    // H    0
+                    // C    Set if bit 0 is 1
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t c = val & 0x01;
+                    uint8_t current_c = af.c;
+                    uint8_t result = (val >> 1) + (current_c << 7);
+
+                    bus->write_byte(hl.reg, result);
+                    int8_t z = (result == 0);
+
+                    setFlags(z, 0, 0, c);
+                } break;
+                case (0x1F):    // RR A
+                {
+                    RR_r8(&af.hi);
+                } break;
+
+
+                // 0x20 - 0x27: SLA r8
+                // 0x28 - 0x2F: SRA r8
+
+                // 0x30 - 0x37: SWAP r8
+                // Swap upper 4 bits with lower 4 bits
+                // 2 bytes, 8 cycles
+                case (0x30):    // SWAP B
+                {
+                    SWAP_r8(&bc.hi);
+                } break;
+                case (0x31):    // SWAP C
+                {
+                    SWAP_r8(&bc.lo);
+                } break;
+                case (0x32):    // SWAP D
+                {
+                    SWAP_r8(&de.hi);
+                } break;
+                case (0x33):    // SWAP E
+                {
+                    SWAP_r8(&de.lo);
+                } break;
+                case (0x34):    // SWAP H
+                {
+                    SWAP_r8(&hl.hi);
+                } break;
+                case (0x35):    // SWAP L
+                {
+                    SWAP_r8(&hl.lo);
+                } break;
+                case (0x36):    // SWAP [HL]
+                {
+                    // Flags
+                    // Z    Set if result is 0
+                    // N    0
+                    // H    0
+                    // C    0
+
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t z = (val == 0);
+                    bus->write_byte(hl.reg, (val >> 4) | (val << 4));
+
+                    setFlags(z, 0, 0, 0);
+                } break;
+                case (0x37):    // SWAP A
+                {
+                    SWAP_r8(&af.hi);
+                } break;
+
+                // 0x38 - 0x3F: SRL r8
+                // Shift right logically r8 (no wrap)
+                // 2 bytes, 8 cycles
+                case (0x38):    // SRL B
+                {
+                    SRL_r8(&bc.hi);
+                } break;
+                case (0x39):    // SRL C
+                {
+                    SRL_r8(&bc.lo);
+                } break;
+                case (0x3A):    // SRL D
+                {
+                    SRL_r8(&de.hi);
+                } break;
+                case (0x3B):    // SRL E
+                {
+                    SRL_r8(&de.lo);
+                } break;
+                case (0x3C):    // SRL H
+                {
+                    SRL_r8(&hl.hi);
+                } break;
+                case (0x3D):    // SRL L
+                {
+                    SRL_r8(&hl.lo);
+                } break;
+                case (0x3E):    // SRL [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+                    int8_t c = val & 0x01;
+                    bus->write_byte(hl.reg, val >> 1);
+
+                    setFlags(0, 0, 0, c);
+                } break;
+                case (0x3F):    // SRL A
+                {
+                    SRL_r8(&af.hi);
+                } break;
+
+                // 0x40 - 0x47: BIT 0, r8
+                // 0x48 - 0x4F: BIT 1, r8
+                // ...
+                // 0x78 - 0x7F: BIT 7, r8
+
+                // 0x80 - 0x87: RES 0, r8
+                case (0x80):    // RES 0, B
+                {
+                    bc.hi &= 0xFE;  // Mask: 1111 1110
+                } break;
+                // 0x88 - 0x8F: RES 1, r8
+                // ...
+                // 0xB8 - 0xBF: RES 7, r8
+
+                // 0xC0 - 0xC7: SET 0, r8
+                case (0xC0):    // SET 0, B
+                {
+                    bc.hi |= 0x01;  // Mask: 0000 0001
+                } break;
+                // 0xC8 - 0xCF: SET 1, r8
+                // ...
+                // 0xF8 - 0xFF: SET 7, r8
+
+                default:
+                {
+                    std::cerr << "Unimplemented Prefix Opcode: 0x" << std::hex << (int)opcode 
+                            << " at PC: 0x" << (pc - 1) << std::endl;
+                    std::exit(1); // Safely crash the emulator so you know exactly what to code next
+                } break;
+            }
+        } break;
+        
 
 
 
@@ -1886,5 +2089,49 @@ void Z80::CP_r8(uint8_t reg_a) {
     int8_t c = reg_a > af.hi;
 
     setFlags(z, 1, h, c);
+    return;
+}
+
+void Z80::RR_r8(uint8_t* reg_a) {
+        // Flags
+        // Z    Set if result is 0
+        // N    0
+        // H    0
+        // C    Set if bit 0 is 1
+
+        int8_t c = *reg_a & 0x01;
+        uint8_t current_c = af.c;
+        *reg_a = (*reg_a >> 1) + (current_c << 7);
+        int8_t z = (*reg_a == 0);
+
+        setFlags(z, 0, 0, c);
+}
+
+void Z80::SWAP_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    0
+
+    int8_t z = (*reg_a == 0);
+    *reg_a = (*reg_a >> 4) | (*reg_a << 4);
+
+    setFlags(z, 0, 0, 0);
+}
+
+void Z80::SRL_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set if bit 0 is 1
+
+    int8_t c = *reg_a & 0x01;
+    int8_t z = (*reg_a == 0x01);
+
+    *reg_a >>= 1;
+
+    setFlags(z, 0, 0, c);
     return;
 }
