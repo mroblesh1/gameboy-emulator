@@ -331,8 +331,8 @@ void Z80::cycle() {
             uint8_t val = bus->read_byte(hl.reg);
             bus->write_byte(hl.reg, val - 1);
             
-            int8_t h = ((val & 0x10) == 0x10);
-            int8_t z = ((val + 1) == 0x00);
+            int8_t h = ((val & 0x0F) == 0x00);
+            int8_t z = ((val - 1) == 0x00);
             setFlags(z, 1, h, -1);
         } break;
         case (0x3D):    // DEC A
@@ -1537,6 +1537,40 @@ void Z80::cycle() {
         } break;
 
 
+        // 0xF8: LD HL, SP + e8
+        // Load signed value e8 + SP to HL register
+        // 2 bytes, 12 cycles
+        case (0xF8):    // LD HL, SP + e8
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    Set if overflow from bit 3.
+            // C    Set if overflow from bit 7.
+
+            uint8_t e8 = bus->read_byte(pc);
+            pc++;
+
+            hl.reg = sp + (int8_t) e8;
+
+            // Check for the half carry of only the lowest 8 bits
+            int8_t h = (((sp & 0xFF) ^ e8 ^ (hl.reg & 0xFF)) & 0x10) >> 4;
+            // To check for the carry, check if the output overflows (when e8 is positive)
+            int8_t c = ((sp & 0xFF) + e8) > 0xFF;
+
+            setFlags(0, 0, h, c);
+        } break;
+
+
+        // 0xF9: LD SP, HL
+        // Load HL register into SP
+        // 1 byte, 8 cycles
+        case (0xF9):    // LD HL, SP + e8
+        {
+            sp = hl.reg;
+        } break;
+
+
 
         // 0xE0: LDH [a8], A
         // Copy value in A reg into [0xFF00 + n8]
@@ -1674,6 +1708,34 @@ void Z80::cycle() {
 
 
 
+        // 0xE8: ADD SP, e8
+        // Add signed value e8 to SP
+        // 2 bytes, 16 cycles
+        case (0xE8):    // ADD SP, e8
+        {
+            // Flags
+            // Z    0
+            // N    0
+            // H    Set if overflow from bit 3.
+            // C    Set if overflow from bit 7.
+
+            uint8_t e8 = bus->read_byte(pc);
+            pc++;
+
+            uint16_t result = sp + (int8_t) e8;
+
+            // Check for the half carry of only the lowest 8 bits
+            int8_t h = (((sp & 0xFF) ^ e8 ^ (result & 0xFF)) & 0x10) >> 4;
+            // To check for the carry, check if the output overflows (when e8 is positive)
+            int8_t c = ((sp & 0xFF) + e8) > 0xFF;
+
+            sp = result;
+
+            setFlags(0, 0, h, c);
+        } break;
+
+
+
         // 0xCB: PREFIX
         // This specifies that the instruction will be a prefix command. Next byte determines which instruction
         // 1 byte, 4 cycles
@@ -1687,8 +1749,141 @@ void Z80::cycle() {
             switch (opcode) {
 
                 // 0x00 - 0x07: RLC r8
+                // Rotate r8 left
+                // 2 bytes, 8 cycles
+                case (0x00):    // RLC B
+                {
+                    RLC_r8(&bc.hi);
+                } break;
+                case (0x01):    // RLC C
+                {
+                    RLC_r8(&bc.lo);
+                } break;
+                case (0x02):    // RLC D
+                {
+                    RLC_r8(&de.hi);
+                } break;
+                case (0x03):    // RLC E
+                {
+                    RLC_r8(&de.lo);
+                } break;
+                case (0x04):    // RLC H
+                {
+                    RLC_r8(&hl.hi);
+                } break;
+                case (0x05):    // RLC L
+                {
+                    RLC_r8(&hl.lo);
+                } break;
+                case (0x06):    // RLC [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t z = (val == 0);
+                    int8_t c = val >> 7;
+
+                    val = (val << 1) | (c & 0x01);
+
+                    bus->write_byte(hl.reg, val);
+
+                    setFlags(z, 0, 0, c);
+                } break;
+                case (0x07):    // RLC A
+                {
+                    RLC_r8(&af.hi);
+                } break;
+
                 // 0x08 - 0x0F: RRC r8
+                // Rotate r8 right
+                // 2 bytes, 8 cycles
+                case (0x08):    // RRC B
+                {
+                    RRC_r8(&bc.hi);
+                } break;
+                case (0x09):    // RRC C
+                {
+                    RRC_r8(&bc.lo);
+                } break;
+                case (0x0A):    // RRC D
+                {
+                    RRC_r8(&de.hi);
+                } break;
+                case (0x0B):    // RRC E
+                {
+                    RRC_r8(&de.lo);
+                } break;
+                case (0x0C):    // RRC H
+                {
+                    RRC_r8(&hl.hi);
+                } break;
+                case (0x0D):    // RRC L
+                {
+                    RRC_r8(&hl.lo);
+                } break;
+                case (0x0E):    // RRC [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t z = (val == 0);
+                    int8_t c = val & 0x01;
+
+                    val = (c << 7) | (val >> 1);
+
+                    bus->write_byte(hl.reg, val);
+
+                    setFlags(z, 0, 0, c);
+                }
+                case (0x0F):    // RRC A
+                {
+                    RRC_r8(&af.hi);
+                } break;
+                
+
                 // 0x10 - 0x17: RL r8
+                case (0x10):    // RL B
+                {
+                    RL_r8(&bc.hi);
+                } break;
+                case (0x11):    // RL C
+                {
+                    RL_r8(&bc.lo);
+                } break;
+                case (0x12):    // RL D
+                {
+                    RL_r8(&de.hi);
+                } break;
+                case (0x13):    // RL E
+                {
+                    RL_r8(&de.lo);
+                } break;
+                case (0x14):    // RL H
+                {
+                    RL_r8(&hl.hi);
+                } break;
+                case (0x15):    // RL L
+                {
+                    RL_r8(&hl.lo);
+                } break;
+                case (0x16):    // RL [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t c = val >> 7;
+                    uint8_t current_c = af.c;
+                    val = (val << 1) | (current_c & 0x01);
+                    int8_t z = (val == 0);
+
+                    bus->write_byte(hl.reg, val);
+
+                    setFlags(z, 0, 0, c);
+                } break;
+                case (0x17):    // RL A
+                {
+                    RL_r8(&af.hi);
+                } break;
 
                 // 0x18 - 0x1F: RR r8
                 // Rotate right r8 through the carry bit. Think of it as a 9-bit register
@@ -1719,11 +1914,7 @@ void Z80::cycle() {
                 } break;
                 case (0x1E):    // RR [HL]
                 {
-                    // Flags
-                    // Z    Set if result is 0
-                    // N    0
-                    // H    0
-                    // C    Set if bit 0 is 1
+                    // 2 bytes, 16 cycles
                     uint8_t val = bus->read_byte(hl.reg);
 
                     int8_t c = val & 0x01;
@@ -1742,7 +1933,96 @@ void Z80::cycle() {
 
 
                 // 0x20 - 0x27: SLA r8
+                // Shift r8 left arithmetically
+                // 2 bytes, 8 cycles
+                case (0x20):    // SLA B
+                {
+                    SLA_r8(&bc.hi);
+                } break;
+                case (0x21):    // SLA C
+                {
+                    SLA_r8(&bc.lo);
+                } break;
+                case (0x22):    // SLA D
+                {
+                    SLA_r8(&de.hi);
+                } break;
+                case (0x23):    // SLA E
+                {
+                    SLA_r8(&de.lo);
+                } break;
+                case (0x24):    // SLA H
+                {
+                    SLA_r8(&hl.hi);
+                } break;
+                case (0x25):    // SLA L
+                {
+                    SLA_r8(&hl.lo);
+                } break;
+                case (0x26):    // SLA [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t c = val >> 7;
+                    
+                    val <<= 1;
+
+                    uint8_t z = (val == 0);
+                    bus->write_byte(hl.reg, val);
+                    setFlags(z, 0, 0, c);
+                } break;
+                case (0x27):    // SLA A
+                {
+                    SLA_r8(&af.hi);
+                } break;
+
+                
                 // 0x28 - 0x2F: SRA r8
+                // Shift r8 right arithmetically
+                // 2 bytes, 8 cycles
+                case (0x28):    // SRA B
+                {
+                    SRA_r8(&bc.hi);
+                } break;
+                case (0x29):    // SRA C
+                {
+                    SRA_r8(&bc.lo);
+                } break;
+                case (0x2A):    // SRA D
+                {
+                    SRA_r8(&de.hi);
+                } break;
+                case (0x2B):    // SRA E
+                {
+                    SRA_r8(&de.lo);
+                } break;
+                case (0x2C):    // SRA H
+                {
+                    SRA_r8(&hl.hi);
+                } break;
+                case (0x2D):    // SRA L
+                {
+                    SRA_r8(&hl.lo);
+                } break;
+                case (0x2E):    // SRA [HL]
+                {
+                    // 2 bytes, 16 cycles
+                    uint8_t val = bus->read_byte(hl.reg);
+
+                    int8_t c = val & 0x01;
+                    
+                    val = (val & 0x80) | (val >> 1);
+
+                    uint8_t z = (val == 0);
+                    bus->write_byte(hl.reg, val);
+                    setFlags(z, 0, 0, c);
+                } break;
+                case (0x2F):    // SRA A
+                {
+                    SRA_r8(&af.hi);
+                } break;
+
 
                 // 0x30 - 0x37: SWAP r8
                 // Swap upper 4 bits with lower 4 bits
@@ -1773,11 +2053,7 @@ void Z80::cycle() {
                 } break;
                 case (0x36):    // SWAP [HL]
                 {
-                    // Flags
-                    // Z    Set if result is 0
-                    // N    0
-                    // H    0
-                    // C    0
+                    // 2 bytes, 16 cycles
 
                     uint8_t val = bus->read_byte(hl.reg);
 
@@ -1823,9 +2099,12 @@ void Z80::cycle() {
                     // 2 bytes, 16 cycles
                     uint8_t val = bus->read_byte(hl.reg);
                     int8_t c = val & 0x01;
-                    bus->write_byte(hl.reg, val >> 1);
+                    val >>= 1;
+                    int8_t z = (val == 0);
+                    
+                    bus->write_byte(hl.reg, val);
 
-                    setFlags(0, 0, 0, c);
+                    setFlags(z, 0, 0, c);
                 } break;
                 case (0x3F):    // SRL A
                 {
@@ -1946,7 +2225,7 @@ void Z80::DEC_r8(uint8_t* reg_a) {
     // H    Set if borrow from bit 4.
     // C    Unchanged
 
-    int8_t h = ((*reg_a & 0x10) == 0x10);
+    int8_t h = ((*reg_a & 0x0F) == 0x00);
     (*reg_a)--;
     int8_t z = (*reg_a == 0x00);
     setFlags(z, 1, h, -1);
@@ -1984,15 +2263,16 @@ void Z80::ADC_r8(uint8_t reg_a) {
     // N    0
     // H    Set if overflow from bit 3.
     // C    Set if overflow from bit 7.
-    uint8_t result = af.hi + reg_a + af.c;
+    int16_t result = af.hi + reg_a + af.c;
 
-    int8_t z = (result == 0);
-    // To check for the half carry of a 8-bit number, check the value of the 4th bit
-    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
-    // To check for the carry, check if the output is less than reg_a
-    int8_t c = result < reg_a;
+    // Check if half carry overflow
+    int8_t h = ((reg_a & 0x0F) + (af.hi & 0x0F) + (af.c & 0x0F)) > 0x0F;
+    // Check if overflow
+    int8_t c = result > 0xFF;
 
-    af.hi = result;
+    af.hi = (uint8_t) result;
+
+    int8_t z = (af.hi == 0);
     setFlags(z, 0, h, c);
     return;
 }
@@ -2022,15 +2302,16 @@ void Z80::SBC_r8(uint8_t reg_a) {
     // N    1
     // H    Set if borrow from bit 4.
     // C    Set if borrow from bit 8.
-    uint8_t result = af.hi - reg_a - af.c;
+    int16_t result = af.hi - reg_a - af.c;
 
-    int8_t z = (result == 0);
     // To check for the half carry of a 8-bit number, check the value of the 4th bit
-    int8_t h = ((reg_a ^ af.hi ^ result) & 0x10) >> 4;
+    int8_t h = ((af.hi & 0x0F) - (reg_a & 0x0F) - af.c) < 0;
     // To check for the carry, check if the subtracting operand is less than reg_a
-    int8_t c = reg_a > af.hi;
+    int8_t c = result < 0;
 
-    af.hi = result;
+    af.hi = (uint8_t) result;
+
+    int8_t z = (af.hi == 0);
     setFlags(z, 1, h, c);
     return;
 }
@@ -2092,19 +2373,90 @@ void Z80::CP_r8(uint8_t reg_a) {
     return;
 }
 
+void Z80::RLC_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set based on bit rotated out
+    int8_t z = (*reg_a == 0);
+    int8_t c = *reg_a >> 7;
+
+    *reg_a = (*reg_a << 1) | (c & 0x01);
+
+    setFlags(z, 0, 0, c);
+}
+
+void Z80::RRC_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set according to bit rotated out
+    int8_t z = (*reg_a == 0);
+    int8_t c = *reg_a & 0x01;
+
+    *reg_a = (c << 7) | (*reg_a >> 1);
+
+    setFlags(z, 0, 0, c);
+}
+
+void Z80::RL_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set according to bit rotated out
+
+    int8_t c = *reg_a >> 7;
+    uint8_t current_c = af.c;
+    *reg_a = (*reg_a << 1) | (current_c & 0x01);
+    int8_t z = (*reg_a == 0);
+
+    setFlags(z, 0, 0, c);
+}
+
 void Z80::RR_r8(uint8_t* reg_a) {
-        // Flags
-        // Z    Set if result is 0
-        // N    0
-        // H    0
-        // C    Set if bit 0 is 1
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set if bit 0 is 1
 
-        int8_t c = *reg_a & 0x01;
-        uint8_t current_c = af.c;
-        *reg_a = (*reg_a >> 1) + (current_c << 7);
-        int8_t z = (*reg_a == 0);
+    int8_t c = *reg_a & 0x01;
+    uint8_t current_c = af.c;
+    *reg_a = (*reg_a >> 1) | (current_c << 7);
+    int8_t z = (*reg_a == 0);
 
-        setFlags(z, 0, 0, c);
+    setFlags(z, 0, 0, c);
+}
+
+void Z80::SLA_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set based on bit shifted out
+    int8_t c = *reg_a >> 7;
+                    
+    *reg_a <<= 1;
+
+    uint8_t z = (*reg_a == 0);
+    setFlags(z, 0, 0, c);
+}
+
+void Z80::SRA_r8(uint8_t* reg_a) {
+    // Flags
+    // Z    Set if result is 0
+    // N    0
+    // H    0
+    // C    Set based on bit shifted out
+    int8_t c = *reg_a & 0x01;
+                    
+    *reg_a = (*reg_a & 0x80) | (*reg_a >> 1);
+
+    uint8_t z = (*reg_a == 0);
+    setFlags(z, 0, 0, c);
 }
 
 void Z80::SWAP_r8(uint8_t* reg_a) {
@@ -2128,10 +2480,10 @@ void Z80::SRL_r8(uint8_t* reg_a) {
     // C    Set if bit 0 is 1
 
     int8_t c = *reg_a & 0x01;
-    int8_t z = (*reg_a == 0x01);
 
     *reg_a >>= 1;
 
+    int8_t z = (*reg_a == 0x00);
     setFlags(z, 0, 0, c);
     return;
 }

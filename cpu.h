@@ -117,13 +117,13 @@ class Z80 {
 
 
         // PREFIX
-        // 0x00 - 0x07: RLC r8
-        // 0x08 - 0x0F: RRC r8
-        // 0x10 - 0x17: RL r8
+        void RLC_r8(uint8_t* reg_a);    // 0x00 - 0x07: RLC r8
+        void RRC_r8(uint8_t* reg_a);    // 0x08 - 0x0F: RRC r8
+        void RL_r8(uint8_t* reg_a);     // 0x10 - 0x17: RL r8
         void RR_r8(uint8_t* reg_a);     // 0x18 - 0x1F: RR r8
 
-        // 0x20 - 0x27: SLA r8
-        // 0x28 - 0x2F: SRA r8
+        void SLA_r8(uint8_t* reg_a);    // 0x20 - 0x27: SLA r8
+        void SRA_r8(uint8_t* reg_a);     // 0x28 - 0x2F: SRA r8
         void SWAP_r8(uint8_t* reg_a);   // 0x30 - 0x37: SWAP r8
         void SRL_r8(uint8_t* reg_a);    // 0x38 - 0x3F: SRL r8
 
