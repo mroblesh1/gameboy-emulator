@@ -127,21 +127,9 @@ class Z80 {
         void SWAP_r8(uint8_t* reg_a);   // 0x30 - 0x37: SWAP r8
         void SRL_r8(uint8_t* reg_a);    // 0x38 - 0x3F: SRL r8
 
-        // 0x40 - 0x47: BIT 0, r8
-        // 0x48 - 0x4F: BIT 1, r8
-        // ...
-        // 0x78 - 0x7F: BIT 7, r8
-        
-        // 0x80 - 0x87: RES 0, r8
-        // 0x88 - 0x8F: RES 1, r8
-        // ...
-        // 0xB8 - 0xBF: RES 7, r8
-
-        // 0xC0 - 0xC7: SET 0, r8
-        // 0xC8 - 0xCF: SET 1, r8
-        // ...
-        // 0xF8 - 0xFF: SET 7, r8
-
+        void BIT(uint8_t bit, uint8_t* reg_a);  // 0x40 - 0x7F: BIT u3, r8
+        void RES(uint8_t bit, uint8_t* reg_a);  // 0x80 - 0xBF: RES u3, r8
+        void SET(uint8_t bit, uint8_t* reg_a);  // 0xC0 - 0xFF: SET u3, r8
 
 };
 

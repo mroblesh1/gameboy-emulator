@@ -77,7 +77,14 @@ int main(int argc, char** argv) {
 
 
     // Loading in the test ROM
-    bus.loadROM("ROMs/09-op r,r.gb");
+    
+    if (argc != 2) {
+        printf("Please enter one ROM\n");
+        return -1;
+    }
+    
+    char* ROM = argv[1];
+    bus.loadROM(ROM);
 
     while (true) {
         z80.cycle();
